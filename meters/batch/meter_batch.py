@@ -6,13 +6,12 @@ import scipy
 import dill
 import blosc
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 
 sys.path.append('..')
 from dataset.dataset import ImagesBatch, action, inbatch_parallel
 
-class WaterBatch(ImagesBatch):
+class MeterBatch(ImagesBatch):
     """Class to create batch with water meter"""
     components = 'images', 'labels', 'coordinates', 'indices'
 
