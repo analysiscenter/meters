@@ -25,7 +25,7 @@ class MeterBatch(ImagesBatch):
 
     def _init_component(self, *args, **kwargs):
         """Create and preallocate a new attribute with the name ``dst`` if it
-        does not exist and return batch indices."""
+        does not exist and return batch indices"""
         _ = args, kwargs
         dst = kwargs.get('dst')
         if dst is None:
@@ -58,7 +58,7 @@ class MeterBatch(ImagesBatch):
 
     @action
     @inbatch_parallel(init='_init_component', src='cropped', dst='sepcrop', target='threads')
-    def crop_to_numbers(self, ind, *args, shape=(64, 32), src='cropped', dst='sepcrop', **kwargs):
+    def crop_to_numbers(self, ind, *args, shape=(64, 32), num_split=8, src='cropped', dst='sepcrop', **kwargs):
         """Crop image with 8 number to 8 images with one number
 
         Parameters
@@ -73,7 +73,10 @@ class MeterBatch(ImagesBatch):
         the name of the placeholder with data
 
         dst : str
-        the name of the placeholder in witch the result will be recorded"""
+        the name of the placeholder in witch the result will be recorded
+
+        num_split : int
+            number of digits on meter"""
 
         def _resize(img, shape):
             factor = 1. * np.asarray([*shape]) / np.asarray(img.shape[:2])
@@ -85,7 +88,7 @@ class MeterBatch(ImagesBatch):
         _ = args, kwargs
         i = self.get_pos(None, src, ind)
         image = getattr(self, src)[i]
-        numbers = np.array([_resize(img, shape) for img in np.array_split(image, 8, axis=1)] + [None])[:-1]
+        numbers = np.array([_resize(img, shape) for img in np.array_split(image, num_split, axis=1)] + [None])[:-1]
 
         getattr(self, dst)[i] = numbers
 
