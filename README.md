@@ -9,7 +9,8 @@ Main features:
 
 # About Meters
 
-Meters hes one module: (``batch``)[].
+Meters has one module: (``batch``)[https://github.com/analysiscenter/meters/tree/master/meters/batch].
+
 ``batch`` contains MeterBatch class witch include actions for preprocessing.
 
 # Basic usage
