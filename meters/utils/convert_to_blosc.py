@@ -1,9 +1,16 @@
-"""File to compless images to blosc format.
-Can use with aruments from command line.
--i - path_from. It's a path with images.
--b - path_to. It's a path with created blosc files.
--d delete all images
-If path_from and path_to is empty - images will getting from working directory and blosc files saved in the same place"""
+"""File to compless images to blosc format. Can use with aruments from command line.
+If path_from and path_to is empty - images will getting from working directory and blosc files saved in the same place.
+Arguments
+---------
+-i : string
+    A path or name of directory to images
+
+-o : string
+    Name of directory or path to created blosc files
+
+-d : bool
+    delete all images
+"""
 import os
 import sys
 import dill
@@ -17,13 +24,13 @@ def compress():
     """Convert images from any format to blosc format."""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--path_images', type=str, help='name of path with images')
-    parser.add_argument('-b', '--path_blosc', type=str, help='name of path where blosc files will be created')
+    parser.add_argument('-i', '--images', type=str, help='name of path with images')
+    parser.add_argument('-o', '--output', type=str, help='name of path where blosc files will be created')
     parser.add_argument('-d', '--delete', action='store_true', help='delete images')
     args = parser.parse_args()
 
-    path_from = args.path_images if args.path_images else './'
-    path_to = args.path_blosc if args.path_blosc else path_from
+    path_from = args.images if args.images else './'
+    path_to = args.output if args.output else path_from
 
     print('path from: %s'%path_from)
     print('path to: %s\n'%path_to)
