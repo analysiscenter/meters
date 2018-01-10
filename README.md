@@ -1,6 +1,6 @@
 # meters
 
-`Meters` the way to create machine learning models for recognition of digits on any meters.
+`Meters` the way to create end-to-end machine learning models for recognition of digits on any meters.
 
 Main features:
 * Convert images to blosc format
@@ -18,21 +18,23 @@ Meters has one module: [``batch``](https://github.com/analysiscenter/meters/tree
 Here is an example of pipeline that loads blosc images, make preprocessing and train a model over 50 epochs:
 ```python
 ppl = (
-	dataset.train
+    dataset.train
     .load(src=src, fmt='blosc', components='images')
-    .load(src='./data/labels/meters.csv', \
-    	  fmt='csv',\
-          components='labels',\
-          usecols=['file_name', 'counter_value'], crop_labels=True)
-    .load(src='./data/labels/answers.csv', \
-          fmt='csv', \
-          components='coordinates',\
+    .load(src='data/labels/meters.csv',
+          fmt='csv',
+          components='labels',
+          usecols=['file_name',
+                   'counter_value'],
+          crop_labels=True)
+    .load(src='data/labels/answers.csv',
+          fmt='csv',
+          components='coordinates',
           usecols=['markup'])
-	.normalize_images()
+    .normalize_images()
     .crop_to_bbox()
     .crop_to_numbers()
     .init_model('dynamic',
-				MeterModel,
+                MeterModel,
                 'meter_model',
                 config=model_config)
     .train_model('meter_model',
@@ -41,10 +43,10 @@ ppl = (
                  save_to=V('loss'),
                  mode='a')
     .run(batch_size=25, shuffle=True, drop_last=True, n_epochs=50)
-)
-```
+  )```
+
 # Installation
 
 With [git clone](https://git-scm.com/docs/git-clone):
 
-	git clone https://github.com/analysiscenter/meters.git
+  git clone https://github.com/analysiscenter/meters.git
