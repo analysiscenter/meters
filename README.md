@@ -1,15 +1,15 @@
 # meters
 
-`Meters` the way to create end-to-end machine learning models for recognition of digits on any meters.
+`Meters` is a framework for building end-to-end machine learning models for recognition of digits on any meters.
 
 Main features:
 * Convert images to blosc format
-* load images and labels (from csv, png and blosc)
-* crop bbox, crop bbox to separate numbers
+* load images and labels (from csv, jpg and blosc
+* crop bbox, split bbox and labels to separate numbers.
 
 # About Meters
 
-Meters has one module: [``batch``](https://github.com/analysiscenter/meters/tree/master/meters/batch).
+Meters has one module: [``batch``](https://github.com/analysiscenter/meters/tree/master/meters/batch)
 
 ``batch`` contains MeterBatch class witch include actions for preprocessing.
 
