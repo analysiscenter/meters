@@ -13,10 +13,10 @@ Arguments
 """
 import os
 import sys
-import dill
-
-import blosc
 import argparse
+
+import dill
+import blosc
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 

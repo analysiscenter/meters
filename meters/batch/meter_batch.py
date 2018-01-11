@@ -1,15 +1,14 @@
 """Batch class for water meter task"""
-import sys
 import re
 
 import scipy
 import dill
 import blosc
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
-sys.path.append('..')
-from dataset.dataset import ImagesBatch, action, inbatch_parallel
+from ..dataset import ImagesBatch, action, inbatch_parallel
 
 class MeterBatch(ImagesBatch):
     """Class to create batch with water meter"""
@@ -18,7 +17,7 @@ class MeterBatch(ImagesBatch):
     @action
     @inbatch_parallel(init='indices', src='images', post='assemble')
     def normalize_images(self, ind, src='images'):
-        """ Normalize pixel values to (0, 1). """
+        """ Normalize pixel values from (0, 255) to (0, 1). """
         image = self.get(ind, src)
         normalize_image = image / 255.
         return normalize_image
@@ -39,16 +38,16 @@ class MeterBatch(ImagesBatch):
     def crop_to_bbox(self, ind, *args, src='images', dst='cropped', **kwargs):
         """Create cropped attr with crop image use ``coordinates``
 
-        Parameter
+        Parameters
         ----------
         ind : str or int
-        dataset index
+            dataset index
 
         src : str
-        the name of the placeholder with data
+            the name of the placeholder with data
 
         dst : str
-        the name of the placeholder in witch the result will be recorded"""
+            the name of the placeholder in witch the result will be recorded"""
         _ = args, kwargs
         image = self.get(ind, src)
         x, y, width, height = self.get(ind, 'coordinates')
@@ -59,21 +58,21 @@ class MeterBatch(ImagesBatch):
     @action
     @inbatch_parallel(init='_init_component', src='cropped', dst='sepcrop', target='threads')
     def crop_to_numbers(self, ind, *args, shape=(64, 32), num_split=8, src='cropped', dst='sepcrop', **kwargs):
-        """Crop image with 8 number to 8 images with one number
+        """Crop image with ``num_split`` number to ``num_split`` images with one number
 
         Parameters
         ----------
         ind : str or int
-        dataset index
+            dataset index
 
         shape : tuple or list
-        shape of output image
+            shape of output image
 
         src : str
-        the name of the placeholder with data
+            the name of the placeholder with data
 
         dst : str
-        the name of the placeholder in witch the result will be recorded
+            the name of the placeholder in witch the result will be recorded
 
         num_split : int
             number of digits on meter"""
@@ -137,22 +136,18 @@ class MeterBatch(ImagesBatch):
 
     @action
     def load(self, src, fmt=None, components=None, *args, **kwargs):
-        """
+        """ Loading data into batch with ``fmt`` format.
+        
         Parameters
         ----------
-        src :
+        src : string
             a source (e.g. an array or a file name)
 
         fmt : str
-            a source format, one of 'jpg' or 'csv'
+            a source format, one of 'jpg', 'blosc' or 'csv'
 
         components : None or str or tuple of str
             components to load
-
-        *args :
-            other parameters are passed to format-specific loaders
-        **kwargs :
-            other parameters are passed to format-specific loaders
         """
         if fmt == 'jpg':
             self._load_jpg(src, components, *args, **kwargs)
