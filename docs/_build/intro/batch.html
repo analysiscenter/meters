@@ -1,0 +1,176 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Batch &#8212; Meters 0.1.0 documentation</title>
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="API" href="../api/meters.html" />
+    <link rel="prev" title="Intro" href="intro.html" /> 
+  </head>
+  <body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../api/meters.html" title="API"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="intro.html" title="Intro"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Meters 0.1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="intro.html" accesskey="U">Intro</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="batch">
+<h1>Batch<a class="headerlink" href="#batch" title="Permalink to this headline">¶</a></h1>
+<p>This module stores batch class for preprocessing meters images.</p>
+<div class="section" id="meterbatch">
+<h2>MeterBatch<a class="headerlink" href="#meterbatch" title="Permalink to this headline">¶</a></h2>
+<p><cite>MeterBatch</cite> is the main class that define how to store images and contains all action to preprocessing.</p>
+<p>Attributes of MeterBatch:</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">images</span></code>, input images</li>
+<li><code class="docutils literal"><span class="pre">labels</span></code>, answer for images - string with numbers</li>
+<li><code class="docutils literal"><span class="pre">coordinates</span></code>, array with four numbers - coordinates of one of the corners of the bbox, height and width</li>
+<li><code class="docutils literal"><span class="pre">indices</span></code>, array with indices</li>
+<li><code class="docutils literal"><span class="pre">cropped</span></code>, array with cropped image by <code class="docutils literal"><span class="pre">coordinates</span></code></li>
+<li><code class="docutils literal"><span class="pre">sepcrop</span></code>, array with <code class="docutils literal"><span class="pre">num_split</span></code> numbers from the meter.</li>
+</ul>
+<p>Actions of MeterBatch allows e.g.:
+* load images from png or blosc formats and labels from csv format
+* crop images to bbox
+* split bbox on separate numbers
+* normalize images</p>
+</div>
+<div class="section" id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+<p>If you want to work with MeterBatch you need to create a pipeline object:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">meters</span> <span class="k">import</span> <span class="n">MeterBatch</span>
+<span class="kn">import</span> <span class="nn">dataset</span><span class="o">,</span> <span class="nn">FilesIndex</span><span class="o">,</span> <span class="nn">Pipeline</span>
+
+<span class="n">ix</span> <span class="o">=</span> <span class="n">FilesIndex</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s1">&#39;path/to/images&#39;</span><span class="p">,</span> <span class="n">no_ext</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">dset</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">fileindex</span><span class="p">,</span> <span class="n">batch_class</span><span class="o">=</span><span class="n">MeterBatch</span><span class="p">)</span>
+
+<span class="n">template_ppl</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">Pipeline</span><span class="p">()</span>
+    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="n">src</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span> <span class="n">components</span><span class="o">=</span><span class="s1">&#39;images&#39;</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s1">&#39;path/to/labels&#39;</span><span class="p">,</span>
+          <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;csv&#39;</span><span class="p">,</span>
+          <span class="n">components</span><span class="o">=</span><span class="s1">&#39;labels&#39;</span><span class="p">,</span>
+          <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;file_name&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;counter_value&#39;</span><span class="p">],</span>
+          <span class="n">crop_labels</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s1">&#39;path/to/coordinates&#39;</span><span class="p">,</span>
+          <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;csv&#39;</span><span class="p">,</span>
+          <span class="n">components</span><span class="o">=</span><span class="s1">&#39;coordinates&#39;</span><span class="p">,</span>
+          <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;markup&#39;</span><span class="p">])</span>
+    <span class="o">.</span><span class="n">normalize_images</span><span class="p">()</span>
+    <span class="o">.</span><span class="n">crop_to_bbox</span><span class="p">()</span>
+    <span class="o">.</span><span class="n">crop_to_numbers</span><span class="p">()</span>
+<span class="p">)</span>
+
+<span class="n">ppl</span> <span class="o">=</span> <span class="p">(</span><span class="n">template_ppl</span> <span class="o">&lt;&lt;</span> <span class="n">dset</span><span class="p">)</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">ppl</span><span class="o">.</span><span class="n">next_batch</span><span class="p">(</span><span class="mi">25</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="api">
+<h2>API<a class="headerlink" href="#api" title="Permalink to this headline">¶</a></h2>
+<p>See <a class="reference internal" href="../api/meters.batch.html"><span class="doc">Batch API</span></a></p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Batch</a><ul>
+<li><a class="reference internal" href="#meterbatch">MeterBatch</a></li>
+<li><a class="reference internal" href="#usage">Usage</a></li>
+<li><a class="reference internal" href="#api">API</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="intro.html"
+                        title="previous chapter">Intro</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="../api/meters.html"
+                        title="next chapter">API</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/intro/batch.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../api/meters.html" title="API"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="intro.html" title="Intro"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Meters 0.1.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="intro.html" >Intro</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Analysis Center.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.6.6.
+    </div>
+  </body>
+</html>

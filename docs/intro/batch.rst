@@ -1,4 +1,4 @@
-Batch
+MeterBatch
 ======
 
 This module stores batch class for preprocessing meters images.
@@ -9,12 +9,13 @@ MeterBatch
 `MeterBatch` is the main class that define how to store images and contains all action to preprocessing.
 
 Attributes of MeterBatch:
+
 * ``images``, input images
 * ``labels``, answer for images - string with numbers
-* ``coordinates``, array with four numbers - coordinates of one of the corners of the rectangle, height and width
-* ``indices``, numpy array with indices
-* ``cropped``, numpy array with cropped image by ``coordinates``
-* ``sepcrop``, numpy array with ``num_split`` numbers from the meter.
+* ``coordinates``, array with four numbers - coordinates of one of the corners of the bbox, height and width
+* ``indices``, array with indices
+* ``cropped``, array with cropped image by ``coordinates``
+* ``sepcrop``, array with ``num_split`` numbers from the meter.
 
 Actions of MeterBatch allows e.g.:
 * load images from png or blosc formats and labels from csv format
@@ -26,32 +27,33 @@ Usage
 -----
 
 If you want to work with MeterBatch you need to create a pipeline object::
-	from meters import MeterBatch
-	import dataset, FilesIndex, Pipeline
 
-	ix = FilesIndex(path='path/to/images', no_ext=True)
-	dset = Dataset(fileindex, batch_class=MeterBatch)
+    from meters import MeterBatch
+    import dataset, FilesIndex, Pipeline
 
-	template_ppl = (
-		Pipeline()
-	    .load(src=src, fmt='blosc', components='images')
-	    .load(src='data/labels/meters.csv', \
-	          fmt='csv', \
-	          components='labels', \
-	          usecols=['file_name',
-	                   'counter_value'],
-	          crop_labels=True)
-	    .load(src='data/labels/answers.csv', \
-	          fmt='csv', \
-	          components='coordinates',\
-	          usecols=['markup'])
-	    .normalize_images()
-	    .crop_to_bbox()
-	    .crop_to_numbers()
-	)
+    ix = FilesIndex(path='path/to/images', no_ext=True)
+    dset = Dataset(fileindex, batch_class=MeterBatch)
 
-	ppl = (template_ppl << dset)
-	batch = ppl.next_batch(25)
+    template_ppl = (
+        Pipeline()
+        .load(src=src, fmt='blosc', components='images')
+        .load(src='path/to/labels',
+              fmt='csv',
+              components='labels',
+              usecols=['file_name',
+                       'counter_value'],
+              crop_labels=True)
+        .load(src='path/to/coordinates',
+              fmt='csv',
+              components='coordinates',
+              usecols=['markup'])
+        .normalize_images()
+        .crop_to_bbox()
+        .crop_to_numbers()
+    )
+
+    ppl = (template_ppl << dset)
+    batch = ppl.next_batch(25)
 
 API
 ---

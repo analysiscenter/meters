@@ -16,11 +16,11 @@
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
 
+import os
+import sys
+sys.path.insert(0, os.path.join(".."))
+import meters
 
 # -- General configuration ------------------------------------------------
 
@@ -31,11 +31,6 @@
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-import os
-import sys
-sys.path.insert(0, os.path.join(".."))
-import meters
-
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -62,8 +57,8 @@ source_suffix = ['.rst', '.md']
 master_doc = 'index'
 
 # General information about the project.
-project = 'meters'
-copyright = '2018,  Analysis Center'
+project = 'Meters'
+copyright = '2018, Analysis Center'
 author = 'Analysis Center'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -85,7 +80,7 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = []
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -99,8 +94,12 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
-
+# html_theme = 'alabaster'
+html_theme = "classic"
+# html_theme_options = {
+#     "rightsidebar": "true",
+#     "relbarbgcolor": "black"
+# }
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
@@ -117,18 +116,30 @@ html_static_path = ['_static']
 #
 # This is required for the alabaster theme
 # refs: http://alabaster.readthedocs.io/en/latest/installation.html#sidebars
-html_sidebars = {
-    '**': [
-        'relations.html',  # needs 'show_related': True theme option to display
-        'searchbox.html',
-    ]
+# html_sidebars = {
+#     '**': [
+#         'relations.html',  # needs 'show_related': True theme option to display
+#         'searchbox.html',
+#     ]
+# }
+
+
+autoclass_content = 'class'
+add_module_names = False
+
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+    'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
+    'pandas': ('http://pandas-docs.github.io/pandas-docs-travis/', None),
 }
 
+viewcode_import = True
 
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'metersdoc'
+htmlhelp_basename = 'Metersdoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -156,7 +167,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'meters.tex', 'meters Documentation',
-     'anton-br', 'manual'),
+     'Analysis Center', 'manual'),
 ]
 
 
@@ -185,25 +196,25 @@ texinfo_documents = [
 
 # -- Options for Epub output ----------------------------------------------
 
-# Bibliographic Dublin Core info.
-epub_title = project
-epub_author = author
-epub_publisher = author
-epub_copyright = copyright
+# # Bibliographic Dublin Core info.
+# epub_title = project
+# epub_author = author
+# epub_publisher = author
+# epub_copyright = copyright
 
-# The unique identifier of the text. This can be a ISBN number
-# or the project homepage.
-#
-# epub_identifier = ''
+# # The unique identifier of the text. This can be a ISBN number
+# # or the project homepage.
+# #
+# # epub_identifier = ''
 
-# A unique identification for the text.
-#
-# epub_uid = ''
+# # A unique identification for the text.
+# #
+# # epub_uid = ''
 
-# A list of files that should not be packed into the epub file.
-epub_exclude_files = ['search.html']
+# # A list of files that should not be packed into the epub file.
+# epub_exclude_files = ['search.html']
 
 
 
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+# # Example configuration for intersphinx: refer to the Python standard library.
+# intersphinx_mapping = {'https://docs.python.org/': None}

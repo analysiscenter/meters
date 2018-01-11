@@ -1,0 +1,191 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Welcome to Meter’s documentation! &#8212; Meters 0.1.0 documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Intro" href="intro/intro.html" /> 
+  </head>
+  <body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="intro/intro.html" title="Intro"
+             accesskey="N">next</a> |</li>
+        <li class="nav-item nav-item-0"><a href="#">Meters 0.1.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="welcome-to-meter-s-documentation">
+<h1>Welcome to Meter’s documentation!<a class="headerlink" href="#welcome-to-meter-s-documentation" title="Permalink to this headline">¶</a></h1>
+<p><cite>Meters</cite> is a framework for building end-to-end machine learning models for recognition of digits on any meters.</p>
+<p>Main features:</p>
+<ul class="simple">
+<li>Convert images to blosc format</li>
+<li>load images and labels (from csv, jpg and blosc</li>
+<li>crop bbox, split bbox and labels to separate numbers.</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Meters is based on <a class="reference external" href="https://github.com/analysiscenter/dataset">Dataset</a>. You might benefit from reading <a class="reference external" href="https://analysiscenter.github.io/dataset">its documentation</a>. However, it is not required, especially at the beginning.</p>
+</div>
+<p>Meters has one module: <a class="reference internal" href="api/meters.batch.html"><span class="doc">batch</span></a></p>
+<p><code class="docutils literal"><span class="pre">batch</span></code> contains MeterBatch class witch include actions for preprocessing.</p>
+<div class="section" id="contents">
+<h2>Contents<a class="headerlink" href="#contents" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro/intro.html">Intro</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="intro/batch.html">Batch</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api/meters.html">API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/meters.batch.html">Batch</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="basic-usage">
+<h2>Basic usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h2>
+<p>Here is an example of pipeline that loads blosc images, make preprocessing and train a model over 50 epochs:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ppl</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">dataset</span><span class="o">.</span><span class="n">train</span>
+    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="n">src</span><span class="p">,</span>
+          <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span>
+          <span class="n">components</span><span class="o">=</span><span class="s1">&#39;images&#39;</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s1">&#39;data/labels/meters.csv&#39;</span><span class="p">,</span>
+          <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;csv&#39;</span><span class="p">,</span>
+          <span class="n">components</span><span class="o">=</span><span class="s1">&#39;labels&#39;</span><span class="p">,</span>
+          <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;file_name&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;counter_value&#39;</span><span class="p">],</span>
+          <span class="n">crop_labels</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s1">&#39;data/labels/answers.csv&#39;</span><span class="p">,</span>
+          <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;csv&#39;</span><span class="p">,</span>
+          <span class="n">components</span><span class="o">=</span><span class="s1">&#39;coordinates&#39;</span><span class="p">,</span>
+          <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;markup&#39;</span><span class="p">])</span>
+    <span class="o">.</span><span class="n">normalize_images</span><span class="p">()</span>
+    <span class="o">.</span><span class="n">crop_to_bbox</span><span class="p">()</span>
+    <span class="o">.</span><span class="n">crop_to_numbers</span><span class="p">()</span>
+    <span class="o">.</span><span class="n">init_model</span><span class="p">(</span><span class="s1">&#39;dynamic&#39;</span><span class="p">,</span>
+                <span class="n">MeterModel</span><span class="p">,</span>
+                <span class="s1">&#39;meter_model&#39;</span><span class="p">,</span>
+                <span class="n">config</span><span class="o">=</span><span class="n">model_config</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">train_model</span><span class="p">(</span><span class="s1">&#39;meter_model&#39;</span><span class="p">,</span>
+                 <span class="n">fetches</span><span class="o">=</span><span class="s1">&#39;loss&#39;</span><span class="p">,</span>
+                 <span class="n">make_data</span><span class="o">=</span><span class="n">concatenate_water</span><span class="p">,</span>
+                 <span class="n">save_to</span><span class="o">=</span><span class="n">V</span><span class="p">(</span><span class="s1">&#39;loss&#39;</span><span class="p">),</span>
+                 <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;a&#39;</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">drop_last</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">n_epochs</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>With <a class="reference external" href="https://git-scm.com/docs/git-clone/">git clone</a>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">analysiscenter</span><span class="o">/</span><span class="n">meters</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+<p>After that use <code class="docutils literal"><span class="pre">sys.path.append()</span></code> add path to meters and finally just import <cite>meters</cite>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">meters</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="citing-meters">
+<h2>Citing Meters<a class="headerlink" href="#citing-meters" title="Permalink to this headline">¶</a></h2>
+<p>Please cite Meters in your publications if it helps your research.:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Khudorozhkov</span> <span class="n">R</span><span class="o">.</span><span class="p">,</span> <span class="n">Broilovskiy</span> <span class="n">A</span><span class="o">.</span><span class="p">,</span> <span class="n">Mylzenova</span> <span class="n">D</span><span class="o">.</span><span class="p">,</span> <span class="n">Ivanov</span> <span class="n">G</span><span class="o">.</span> <span class="n">Meters</span> <span class="n">library</span> <span class="k">for</span> <span class="n">data</span> <span class="n">science</span> <span class="n">research</span> <span class="n">of</span> <span class="n">heart</span> <span class="n">signals</span><span class="o">.</span> <span class="mf">2018.</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Welcome to Meter’s documentation!</a><ul>
+<li><a class="reference internal" href="#contents">Contents</a></li>
+<li><a class="reference internal" href="#basic-usage">Basic usage</a></li>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#citing-meters">Citing Meters</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Next topic</h4>
+  <p class="topless"><a href="intro/intro.html"
+                        title="next chapter">Intro</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="intro/intro.html" title="Intro"
+             >next</a> |</li>
+        <li class="nav-item nav-item-0"><a href="#">Meters 0.1.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Analysis Center.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.6.6.
+    </div>
+  </body>
+</html>
