@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from ..dataset import ImagesBatch, action, inbatch_parallel
+from ..dataset.dataset import ImagesBatch, action, inbatch_parallel
 
 class MeterBatch(ImagesBatch):
     """Class to create batch with water meter"""
@@ -137,7 +137,7 @@ class MeterBatch(ImagesBatch):
     @action
     def load(self, src, fmt=None, components=None, *args, **kwargs):
         """ Loading data into batch with ``fmt`` format.
-        
+
         Parameters
         ----------
         src : string
