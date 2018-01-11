@@ -61,7 +61,6 @@
 <li><code class="docutils literal"><span class="pre">images</span></code>, input images</li>
 <li><code class="docutils literal"><span class="pre">labels</span></code>, answer for images - string with numbers</li>
 <li><code class="docutils literal"><span class="pre">coordinates</span></code>, array with four numbers - coordinates of one of the corners of the bbox, height and width</li>
-<li><code class="docutils literal"><span class="pre">indices</span></code>, array with indices</li>
 <li><code class="docutils literal"><span class="pre">cropped</span></code>, array with cropped image by <code class="docutils literal"><span class="pre">coordinates</span></code></li>
 <li><code class="docutils literal"><span class="pre">sepcrop</span></code>, array with <code class="docutils literal"><span class="pre">num_split</span></code> numbers from the meter.</li>
 </ul>
@@ -83,15 +82,9 @@
 <span class="n">template_ppl</span> <span class="o">=</span> <span class="p">(</span>
     <span class="n">Pipeline</span><span class="p">()</span>
     <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="n">src</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span> <span class="n">components</span><span class="o">=</span><span class="s1">&#39;images&#39;</span><span class="p">)</span>
-    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s1">&#39;path/to/labels&#39;</span><span class="p">,</span>
-          <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;csv&#39;</span><span class="p">,</span>
-          <span class="n">components</span><span class="o">=</span><span class="s1">&#39;labels&#39;</span><span class="p">,</span>
-          <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;file_name&#39;</span><span class="p">,</span>
-                   <span class="s1">&#39;counter_value&#39;</span><span class="p">],</span>
-          <span class="n">crop_labels</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s1">&#39;path/to/coordinates&#39;</span><span class="p">,</span>
-          <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;csv&#39;</span><span class="p">,</span>
-          <span class="n">components</span><span class="o">=</span><span class="s1">&#39;coordinates&#39;</span><span class="p">,</span>
+    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s1">&#39;path/to/labels&#39;</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;csv&#39;</span><span class="p">,</span> <span class="n">components</span><span class="o">=</span><span class="s1">&#39;labels&#39;</span><span class="p">,</span>
+          <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;file_name&#39;</span><span class="p">,</span> <span class="s1">&#39;counter_value&#39;</span><span class="p">],</span> <span class="n">crop_labels</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s1">&#39;path/to/coordinates&#39;</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;csv&#39;</span><span class="p">,</span> <span class="n">components</span><span class="o">=</span><span class="s1">&#39;coordinates&#39;</span><span class="p">,</span>
           <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;markup&#39;</span><span class="p">])</span>
     <span class="o">.</span><span class="n">normalize_images</span><span class="p">()</span>
     <span class="o">.</span><span class="n">crop_to_bbox</span><span class="p">()</span>
