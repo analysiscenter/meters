@@ -36,8 +36,7 @@ Here is an example of pipeline that loads blosc images, make preprocessing and t
       .load(src=src, fmt='blosc', components='images')
       .load(src='data/labels/meters.csv', fmt='csv', components='labels',
             usecols=['file_name', 'counter_value'], crop_labels=True)
-      .load(src='data/labels/answers.csv', fmt='csv', components='coordinates',
-            usecols=['markup'])
+      .load(src='data/labels/answers.csv', fmt='csv', components='coordinates', usecols=['markup'])
       .normalize_images()
       .crop_to_bbox()
       .crop_to_numbers()
