@@ -43,10 +43,17 @@ ppl = (
                  save_to=V('loss'),
                  mode='a')
     .run(batch_size=25, shuffle=True, drop_last=True, n_epochs=50)
-  )```
+  )
+```
 
 # Installation
 
 With [git clone](https://git-scm.com/docs/git-clone):
 
-  git clone https://github.com/analysiscenter/meters.git
+    git clone https://github.com/analysiscenter/meters.git
+
+If your python file is located in another directory, you might need to add a path to `meters` submodule location::
+
+    import sys
+    sys.path.insert(0, '/path/to/meters')
+    import meters

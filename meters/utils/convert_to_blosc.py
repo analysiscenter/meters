@@ -1,5 +1,6 @@
 """File to compless images to blosc format. Can use with aruments from command line.
 If path_from and path_to is empty - images will getting from working directory and blosc files saved in the same place.
+
 Arguments
 ---------
 -i : string

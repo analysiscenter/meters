@@ -34,15 +34,13 @@ Here is an example of pipeline that loads blosc images, make preprocessing and t
   ppl = (
       dataset.train
       .load(src=src, fmt='blosc', components='images')
-      .load(src='data/labels/meters.csv', fmt='csv', components='labels',
-            usecols=['file_name', 'counter_value'], crop_labels=True)
+      .load(src='data/labels/meters.csv', fmt='csv', components='labels', usecols=['file_name', 'counter_value'], crop_labels=True)
       .load(src='data/labels/answers.csv', fmt='csv', components='coordinates', usecols=['markup'])
       .normalize_images()
       .crop_to_bbox()
       .crop_to_numbers()
       .init_model('dynamic', MeterModel, 'meter_model', config=model_config)
-      .train_model('meter_model', fetches='loss', make_data=concatenate_water,
-                   save_to=V('loss'), mode='a')
+      .train_model('meter_model', fetches='loss', make_data=concatenate_water, save_to=V('loss'), mode='a')
       .run(batch_size=25, shuffle=True, drop_last=True, n_epochs=50)
   )
 
