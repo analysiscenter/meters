@@ -51,14 +51,14 @@ def _format_labels(src, new_name):
         cols = bad_labels.columns
         labels = pd.DataFrame(data=bad_labels[cols[3]].values, index=bad_labels[cols[2]].values,
                               columns=['counter_value'])
+
     labels = labels.loc[[name for name in labels.index.values if 'frame' not in name]]
     labels['counter_value'] = [lab.replace('.', ',') for lab in labels.counter_value.values]
-
     path = _create_new_path(src, new_name)
     pd.DataFrame.to_csv(labels, path)
 
 def _format_coordinates(src_coord, src_labels, new_name):
-    labels = pd.read_csv(src_labels)
+    labels = pd.read_csv(src_labels, index_col='file_name')
     try:
         coord = pd.read_csv(src_coord, usecols=['numbers', 'markup']).dropna().reset_index()
     except ValueError:
@@ -72,8 +72,8 @@ def _format_coordinates(src_coord, src_labels, new_name):
         list_coord = list([int(i) for i in re.sub('\\D+', ' ', string[36:-7]).split(' ')[1:]])
         numbers_coord.append([list_coord] * int(coord['numbers'].loc[i]))
     new_coord = pd.DataFrame(index=labels.index,
-                             columns=['x', 'y', 'width', 'height'],
-                             data=np.concatenate(np.array(numbers_coord)))
+                             columns=['coordinates'],
+                             data=[str(i) for i in np.concatenate(np.array(numbers_coord))])
 
     path = _create_new_path(src_coord, new_name)
     pd.DataFrame.to_csv(new_coord, path)

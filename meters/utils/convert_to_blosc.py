@@ -28,10 +28,15 @@ def compress():
     parser.add_argument('-i', '--images', type=str, help='name of path with images')
     parser.add_argument('-o', '--output', type=str, help='name of path where blosc files will be created')
     parser.add_argument('-d', '--delete', action='store_true', help='delete images')
+    parser.add_argument('-c', '--components', type=str, help='optional, default=images. The name of the components \
+                                                            from witch images be loaded in pipeline')
     args = parser.parse_args()
 
     path_from = args.images if args.images else './'
     path_to = args.output if args.output else path_from
+
+    components = args.components if args.components else tuple(['images'],)
+    components = tuple([components],) if isinstance(components, str) else components
 
     print('path from: %s'%path_from)
     print('path to: %s\n'%path_to)
@@ -43,7 +48,8 @@ def compress():
             image = plt.imread(impath)
             image_path = os.path.join(path_to, imfile[:-4])
             with open(image_path + '.blosc', 'w+b') as file_blosc:
-                file_blosc.write(blosc.compress(dill.dumps(image)))
+                data = dict(zip(components, (image,)))
+                file_blosc.write(blosc.compress(dill.dumps(data)))
             if args.delete:
                 os.remove(impath)
 
