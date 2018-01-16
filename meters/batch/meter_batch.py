@@ -1,14 +1,8 @@
 """Batch class for water meter task"""
-import re
-
 import scipy
-import dill
-import blosc
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 
-from ..dataset.dataset import ImagesBatch, action, inbatch_parallel
+from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed
 
 class MeterBatch(ImagesBatch):
     """Class to create batch with water meter"""
@@ -17,14 +11,30 @@ class MeterBatch(ImagesBatch):
     @action
     @inbatch_parallel(init='indices', src='images', post='assemble')
     def normalize_images(self, ind, src='images'):
-        """ Normalize pixel values from (0, 255) to (0, 1). """
+        """ Normalize pixel values from (0, 255) to (0, 1).
+
+        Parameters
+        ----------
+        ind : str or int
+            dataset index
+
+        src : str
+            the name of the placeholder with data
+
+        Retruns
+        -------
+            normalized images"""
         image = self.get(ind, src)
         normalize_image = image / 255.
         return normalize_image
 
     def _init_component(self, *args, **kwargs):
         """Create and preallocate a new attribute with the name ``dst`` if it
-        does not exist and return batch indices"""
+        does not exist and return batch indices
+
+        Returns
+        -------
+            array with indices from batch"""
         _ = args, kwargs
         dst = kwargs.get('dst')
         if dst is None:
@@ -34,8 +44,8 @@ class MeterBatch(ImagesBatch):
         return self.indices
 
     @action
-    @inbatch_parallel(init='_init_component', src='images', dst='cropped', target='threads')
-    def crop_to_bbox(self, ind, *args, src='images', dst='cropped', **kwargs):
+    @inbatch_parallel(init='_init_component', src='images', dst='bbox', target='threads')
+    def crop_to_bbox(self, ind, *args, src='images', dst='bbox', **kwargs):
         """Create cropped attr with crop image use ``coordinates``
 
         Parameters
@@ -50,15 +60,16 @@ class MeterBatch(ImagesBatch):
             the name of the placeholder in witch the result will be recorded"""
         _ = args, kwargs
         image = self.get(ind, src)
-        x, y, width, height = self.get(ind, 'coordinates')
+        coord_str = self.get(ind, 'coordinates')
+        x, y, width, height = [int(val) for val in coord_str.split()]
         i = self.get_pos(None, src, ind)
         dst_data = image[y:y+height, x:x+width]
         getattr(self, dst)[i] = dst_data
 
     @action
-    @inbatch_parallel(init='_init_component', src='cropped', dst='sepcrop', target='threads')
-    def crop_to_numbers(self, ind, *args, shape=(64, 32), num_split=8, src='cropped', dst='sepcrop', **kwargs):
-        """Crop image with ``num_split`` number to ``num_split`` images with one number
+    @inbatch_parallel(init='_init_component', src='bbox', dst='digits', target='threads')
+    def crop_to_digits(self, ind, *args, shape=(64, 32), n_digits=8, src='bbox', dst='digits', **kwargs):
+        """Crop image with ``n_digits`` number to ``n_digits`` images with one number
 
         Parameters
         ----------
@@ -74,9 +85,8 @@ class MeterBatch(ImagesBatch):
         dst : str
             the name of the placeholder in witch the result will be recorded
 
-        num_split : int
+        n_digits : int
             number of digits on meter"""
-
         def _resize(img, shape):
             factor = 1. * np.asarray([*shape]) / np.asarray(img.shape[:2])
             if len(img.shape) > 2:
@@ -87,74 +97,64 @@ class MeterBatch(ImagesBatch):
         _ = args, kwargs
         i = self.get_pos(None, src, ind)
         image = getattr(self, src)[i]
-        numbers = np.array([_resize(img, shape) for img in np.array_split(image, num_split, axis=1)] + [None])[:-1]
+        numbers = np.array([_resize(img, shape) for img in np.array_split(image, n_digits, axis=1)] + [None])[:-1]
 
         getattr(self, dst)[i] = numbers
 
-    @inbatch_parallel(init='_init_component', src='labels', dst='labels', target='threads')
-    def _crop_labels(self, ind, *args, src='labels', dst='labels', **kwargs):
-        _ = args, kwargs
-        i = self.get_pos(None, src, ind)
-        label = getattr(self, src)[i]
-        more_label = np.array([int(i) for i in label.replace('.', '')] + [None])[:-1]
-        getattr(self, dst)[i] = more_label
-
-    @inbatch_parallel(init='indices', post='assemble')
-    def _load_jpg(self, ind, src, components=None, *args, **kwargs):
-        _ = components, self
-        images = plt.imread(src + ind + '.jpg', *args, **kwargs)
-        return images
-
-    def _load_csv(self, src, components=None, *args, **kwargs):
-        _ = args
-        crop_labels = kwargs.pop('crop_labels') if 'crop_labels' in kwargs.keys() else False
-        if src[-4:] != '.csv':
-            src += '.csv'
-        _data = pd.read_csv(src, *args, **kwargs)
-        if 'file_name' in _data.columns: # pylint: disable=no-member
-            _data = [_data[_data['file_name'] == ind]['counter_value'].values[0] for ind in self.indices]
-
-        else:
-            indices = [int(ind[1:3]) for ind in self.indices]
-            coord = []
-
-            for ind in indices:
-                string = _data.loc[ind].values[0][36:-7] # pylint: disable=no-member
-                coord.append(list([int(i) for i in re.sub('\\D+', ' ', string).split(' ')[1:]]))
-            _data = np.array(coord)
-        setattr(self, components, _data)
-        if crop_labels:
-            self._crop_labels(self.indices)
-
-    @inbatch_parallel(init='indices', post='assemble')
-    def _load_blosc(self, ind, src=None, components=None, *args, **kwargs):
-        _ = args, kwargs, components
-        file_name = self._get_file_name(ind, src, 'blosc')
-        with open(file_name, 'rb') as file:
-            data = dill.loads(blosc.decompress(file.read()))
-        return data
-
     @action
-    def load(self, src, fmt=None, components=None, *args, **kwargs):
-        """ Loading data into batch with ``fmt`` format.
+    @inbatch_parallel(init='_init_component', src='labels', dst='labels', target='threads')
+    def crop_labels(self, ind, *args, src='labels', dst='labels', **kwargs):
+        """Cropped labels from strig to list with separate numbers
 
         Parameters
         ----------
-        src : string
-            a source (e.g. an array or a file name)
+        ind : str or int
+            dataset index
 
-        fmt : str
-            a source format, one of 'jpg', 'blosc' or 'csv'
+        src : str
+            the name of the placeholder with data
 
-        components : None or str or tuple of str
-            components to load
+        dst : str
+            the name of the placeholder in witch the result will be recorded"""
+        _ = args, kwargs
+        i = self.get_pos(None, src, ind)
+        label = getattr(self, src)[i]
+        more_label = np.array([int(i) for i in label.replace(',', '')] + [None])[:-1]
+        getattr(self, dst)[i] = more_label
+
+    def _reraise_exceptions(self, results):
+        """Reraise all exceptions in the ``results`` list.
+        Parameters
+        ----------
+        results : list
+            Post function computation results.
+
+        Raises
+        ------
+        RuntimeError
+            If any paralleled action raised an ``Exception``.
         """
-        if fmt == 'jpg':
-            self._load_jpg(src, components, *args, **kwargs)
-        elif fmt == 'csv':
-            self._load_csv(src, components, *args, **kwargs)
-        elif fmt == 'blosc':
-            self._load_blosc(src, components, *args, **kwargs)
-        else:
-            raise ValueError("Unknown format " + fmt)
+        if any_action_failed(results):
+            all_errors = self.get_errors(results)
+            raise RuntimeError("Cannot assemble the batch", all_errors)
+
+    def _assemble_load(self, results, *args, **kwargs):
+        """Assemble batch use ``results``
+
+        Parameters
+        ----------
+        results : array
+            loaded image
+
+        Returns
+        -------
+        self"""
+        _ = args, kwargs
+        self._reraise_exceptions(results)
+        components = kwargs.get('components', None)
+        if components is None:
+            components = self.components
+        for comp, data in zip(components, zip(*results)):
+            data = np.array(data)
+            setattr(self, comp, data)
         return self

@@ -49,7 +49,7 @@ def _format_labels(src, new_name):
     except ValueError:
         bad_labels = pd.read_csv(src)
         cols = bad_labels.columns
-        labels = pd.DataFrame(data=bad_labels[cols[3]].values, index=bad_labels[cols[2]].values,
+        labels = pd.DataFrame(data=bad_labels[cols[3]].values, index=bad_labels[cols[2]].values,    # pylint: disable=redefined-variable-type
                               columns=['counter_value'])
 
     labels = labels.loc[[name for name in labels.index.values if 'frame' not in name]]
@@ -73,7 +73,7 @@ def _format_coordinates(src_coord, src_labels, new_name):
         numbers_coord.append([list_coord] * int(coord['numbers'].loc[i]))
     new_coord = pd.DataFrame(index=labels.index,
                              columns=['coordinates'],
-                             data=[str(i) for i in np.concatenate(np.array(numbers_coord))])
+                             data=[str(i)[1:-1] for i in np.concatenate(np.array(numbers_coord))])
 
     path = _create_new_path(src_coord, new_name)
     pd.DataFrame.to_csv(new_coord, path)
