@@ -6,3 +6,4 @@ API
    :titlesonly:
 
    meters.batch
+   meters.pipelines

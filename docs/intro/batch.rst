@@ -17,7 +17,8 @@ Attributes of MeterBatch:
 * ``sepcrop``, array with ``num_split`` numbers from the meter.
 
 Actions of MeterBatch allows e.g.:
-* load images from png or blosc formats and labels from csv format
+
+* load images from blosc formats and labels from csv format
 * crop images to bbox
 * split bbox on separate numbers
 * normalize images
@@ -36,11 +37,12 @@ If you want to work with MeterBatch you need to create a pipeline object::
     template_ppl = (
         Pipeline()
         .load(src=src, fmt='blosc', components='images')
-        .load(src='path/to/labels', fmt='csv', components='labels', usecols=['file_name', 'counter_value'], crop_labels=True)
-        .load(src='path/to/coordinates', fmt='csv', components='coordinates', usecols=['markup'])
+        .load(src='path/to/labels', fmt='csv', components='labels', index_col='file_name'))
+        .load(src='path/to/coordinates', fmt='csv', components='coordinates', index_col='file_name')
         .normalize_images()
         .crop_to_bbox()
-        .crop_to_numbers()
+        .crop_to_digits()
+        .crop_labels()
     )
 
     ppl = (template_ppl << dset)
