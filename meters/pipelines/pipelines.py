@@ -12,8 +12,8 @@ _CONFIG = {
     'model': None,
     'model_name': None,
     'fetches': 'output_accuracy',
-    'batch_size': 25,
-    'n_epochs': 1,
+    'batch_size': 1,
+    'n_epochs': None,
     'shuffle': True,
     'drop_last': True
 }
@@ -31,19 +31,19 @@ _MODEL_CONFIG = {
 }
 
 class PipelineFactory:
-    """Consist function for easily creating pipelines
+    """Consists of a function for pipelines creating
 
     Parameters
     ----------
-    static_config : dict
+    config : dict
         configuraton for pipeline and model"""
-    def __init__(self, static_config=None):
+    def __init__(self, config=None):
         self.config = _CONFIG.copy()
         self.model_config = _MODEL_CONFIG.copy()
-        self.update_config(static_config)
+        self.update_config(config)
 
     def update_config(self, config):
-        """Get all parameters from ``config`` and update internal config
+        """Get all parameters from ``config`` and update internal configs
 
         Parameters
         ----------
@@ -81,8 +81,8 @@ class PipelineFactory:
 
     def load_all(self, src):
         """Load data from path with default format.
-        path to images is ``src`` + /images
-        path to labels and coordinates is ``src`` + /labels/labels.csv(coord.csv)
+        path to images is ``src`` + '/images'
+        path to labels and coordinates is ``src`` + '/labels/labels.csv'(coord.csv)
         For images default is blocs format and 'images' as the name of components.
         For labels default is csv format and 'labels' as the name of components.
         For coordinates default is csv format and 'coordinates' as the name of components.
@@ -109,7 +109,7 @@ class PipelineFactory:
 
         Returns
         -------
-            pipeline with action to crop data and to separate digits"""
+            pipeline with action to cropping images to separate digits"""
         crop_ppl = (Pipeline()
                     .normalize_images()
                     .crop_to_bbox()
@@ -151,7 +151,7 @@ class PipelineFactory:
 
         Returns
         -------
-            pipeline witch can train model"""
+            pipeline to train model"""
         self.update_config(ppl_config)
         self.update_config(model_config)
 
@@ -190,7 +190,7 @@ class PipelineFactory:
 
         Returns
         -------
-            pipeline witch can train model"""
+            pipeline to train model"""
         self.update_config(config)
         pred_ppl = self.load_all(src) + self.crop_digits()
         pred_ppl += (Pipeline()
