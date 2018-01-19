@@ -1,5 +1,6 @@
 """Contains a function that compresses images into a blosc format. Can be used with aruments from command line.
-If path_from and path_to are empty then images are read from working directory and blosc files are saved in the same place.
+If path_from and path_to are empty then images are read from working directory and blosc files are saved in the
+same place.
 
 Arguments
 ---------
