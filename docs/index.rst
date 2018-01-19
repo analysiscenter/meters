@@ -7,7 +7,7 @@ Main features:
 
 * convert images to blosc format
 * load images(from blosc) and labels (from csv)
-* crop bbox, split bbox and labels to separate numbers
+* crop to display, split display and labels to separate numbers
 * arrange new custom actions into pipeline
 * easily configure pipeline
 * build, train and test custom models for research.
@@ -41,10 +41,9 @@ Here is an example of pipelines that loads blosc images, makes preprocessing and
       .load(src=src, fmt='blosc', components='images')
       .load(src='path/to/labels', fmt='csv', components='labels', index_col='file_name')
       .load(src='path/to/coordinates', fmt='csv', components='coordinates', index_col='file_name')
-      .normalize_images()
-      .crop_to_bbox()
-      .crop_to_digits()
-      .crop_labels()
+      .crop_to_display()
+      .split_labels()
+      .split_to_digits()
       .init_model('dynamic', MeterModel, 'meter_model', config=model_config)
       .train_model('meter_model', fetches='loss', make_data=concatenate_water, save_to=V('loss'), mode='a')
       .run(batch_size=25, shuffle=True, drop_last=True, n_epochs=50)
