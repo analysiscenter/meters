@@ -1,16 +1,16 @@
-"""File to compless images to blosc format. Can use with aruments from command line.
-If path_from and path_to is empty - images will getting from working directory and blosc files saved in the same place.
+"""Contains a function that compresses images into a blosc format. Can be used with aruments from command line.
+If path_from and path_to are empty then images are read from working directory and blosc files are saved in the same place.
 
 Arguments
 ---------
 -i : string
-    A path or name of directory to images
+    Path to the images' directory
 
 -o : string
-    Name of directory or path to created blosc files
+    Path to the blosc files' directory
 
 -d : bool
-    delete all images
+    Whether to delete all images
 """
 import os
 import sys
@@ -22,7 +22,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 def compress():
-    """Convert images from any format to blosc format."""
+    """Convert images from format which can be loaded by matplotlib to blosc format."""
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--images', type=str, help='name of path with images')
