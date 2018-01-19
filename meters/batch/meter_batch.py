@@ -1,41 +1,21 @@
+# pylint: disable=attribute-defined-outside-init
 """Batch class for water meter task"""
-import scipy
 import numpy as np
 
-from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed
+from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed, DatasetIndex
 
 class MeterBatch(ImagesBatch):
-    """Class to create batch with water meter"""
+    """Class to create meters' batch"""
     components = 'images', 'labels', 'coordinates', 'indices'
 
-    @action
-    @inbatch_parallel(init='indices', src='images', post='assemble')
-    def normalize_images(self, ind, src='images'):
-        """ Normalize pixel values from (0, 255) to (0, 1).
-
-        Parameters
-        ----------
-        ind : str or int
-            dataset index
-
-        src : str
-            the name of the placeholder with data
-
-        Retruns
-        -------
-            normalized images"""
-        image = self.get(ind, src)
-        normalize_image = image / 255.
-        return normalize_image
-
-    def _init_component(self, *args, **kwargs):
-        """Create and preallocate a new attribute with the name ``dst`` if it
-        does not exist and return batch indices
+    def _init_component(self, **kwargs):
+        """Create a new attribute with the name specified by ``kwargs['dst']``,
+        preallocate memory for it and return batch's indices
 
         Returns
         -------
-            array with indices from batch"""
-        _ = args, kwargs
+        array with indices from batch
+        """
         dst = kwargs.get('dst')
         if dst is None:
             raise KeyError('dst argument must be specified')
@@ -44,91 +24,75 @@ class MeterBatch(ImagesBatch):
         return self.indices
 
     @action
-    @inbatch_parallel(init='_init_component', src='images', dst='bbox', target='threads')
-    def crop_to_bbox(self, ind, *args, src='images', dst='bbox', **kwargs):
-        """Create cropped attr with crop image use ``coordinates``
+    @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
+    def crop_to_display(self, ix, src='images', dst='display'):
+        """Crop area from image using ``coordinates`` attribute
 
         Parameters
         ----------
-        ind : str or int
-            dataset index
-
+        ix : str or int
+            dataset's index
         src : str
-            the name of the placeholder with data
-
+            data placeholder's name
         dst : str
-            the name of the placeholder in witch the result will be recorded"""
-        _ = args, kwargs
-        image = self.get(ind, src)
-        coord_str = self.get(ind, 'coordinates')
-        x, y, width, height = [int(val) for val in coord_str.split()]
-        i = self.get_pos(None, src, ind)
-        dst_data = image[y:y+height, x:x+width]
+            the name of the placeholder's in witch the result will be recorded
+        """
+        image = self.get(ix, src)
+        coord_str = self.get(ix, 'coordinates')
+        x, y, width, height = list(map(int, coord_str.split()))
+        i = self.get_pos(None, src, ix)
+        dst_data = image[y:y+height, x:x+width].copy()
         getattr(self, dst)[i] = dst_data
 
     @action
-    @inbatch_parallel(init='_init_component', src='bbox', dst='digits', target='threads')
-    def crop_to_digits(self, ind, *args, shape=(64, 32), n_digits=8, src='bbox', dst='digits', **kwargs):
-        """Crop image with ``n_digits`` number to ``n_digits`` images with one number
+    def split_to_digits(self, n_digits=8):
+        """Crop image with ``n_digits`` number s to ``n_digits`` images with one number
 
         Parameters
         ----------
-        ind : str or int
-            dataset index
-
-        shape : tuple or list
-            shape of output image
-
-        src : str
-            the name of the placeholder with data
-
-        dst : str
-            the name of the placeholder in witch the result will be recorded
-
         n_digits : int
-            number of digits on meter"""
-        def _resize(img, shape):
-            factor = 1. * np.asarray([*shape]) / np.asarray(img.shape[:2])
-            if len(img.shape) > 2:
-                factor = np.concatenate((factor, [1.] * len(img.shape[2:])))
-            new_image = scipy.ndimage.interpolation.zoom(img, factor, order=3)
-            return new_image
+            number of digits on meter
+        Return
+        ------
+        a new instance of ImagesBatch class
+        """
+        batch = ImagesBatch(DatasetIndex(np.arange(len(self.labels.reshape(-1)))))
+        batch.labels = self.labels.reshape(-1)
+        numbers = np.array([None] * len(self.index))
+        for i, image in enumerate(self.display):
+            # We add [None] because numpy can not automaticlly create an array with the object type.
+            numbers[i] = np.array([*np.array_split(image, n_digits, axis=1) + [None]])[:-1]
 
-        _ = args, kwargs
-        i = self.get_pos(None, src, ind)
-        image = getattr(self, src)[i]
-        numbers = np.array([_resize(img, shape) for img in np.array_split(image, n_digits, axis=1)] + [None])[:-1]
-
-        getattr(self, dst)[i] = numbers
+        batch.images = np.concatenate(numbers)
+        return batch
 
     @action
-    @inbatch_parallel(init='_init_component', src='labels', dst='labels', target='threads')
-    def crop_labels(self, ind, *args, src='labels', dst='labels', **kwargs):
-        """Cropped labels from strig to list with separate numbers
+    @inbatch_parallel(init='indices', post='assemble', src='labels', components='labels')
+    def split_labels(self, ix, src='labels'):
+        """Splited labels from strig to list with separate numbers
 
         Parameters
         ----------
-        ind : str or int
-            dataset index
-
+        ix : str or int
+            dataset's index
         src : str
-            the name of the placeholder with data
-
-        dst : str
-            the name of the placeholder in witch the result will be recorded"""
-        _ = args, kwargs
-        i = self.get_pos(None, src, ind)
+            the name of the placeholder's with data
+        Returns
+        -------
+        array with int digits
+        """
+        i = self.get_pos(None, src, ix)
         label = getattr(self, src)[i]
-        more_label = np.array([int(i) for i in label.replace(',', '')] + [None])[:-1]
-        getattr(self, dst)[i] = more_label
+        more_label = list(map(int, label.replace(',', '')))
+        return more_label
 
     def _reraise_exceptions(self, results):
         """Reraise all exceptions in the ``results`` list.
+
         Parameters
         ----------
         results : list
             Post function computation results.
-
         Raises
         ------
         RuntimeError
@@ -139,17 +103,17 @@ class MeterBatch(ImagesBatch):
             raise RuntimeError("Cannot assemble the batch", all_errors)
 
     def _assemble_load(self, results, *args, **kwargs):
-        """Assemble batch use ``results``
+        """Assemble batch using ``results``
 
         Parameters
         ----------
         results : array
-            loaded image
-
+            loaded data
         Returns
         -------
-        self"""
-        _ = args, kwargs
+        self
+        """
+        _ = args
         self._reraise_exceptions(results)
         components = kwargs.get('components', None)
         if components is None:

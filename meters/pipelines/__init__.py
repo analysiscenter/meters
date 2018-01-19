@@ -1,2 +1,2 @@
 """Contains Meters pipelines."""
-from .pipelines import * # pylint: disable=wildcard-import
+from .pipelines import PipelineFactory
