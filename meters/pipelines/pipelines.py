@@ -30,7 +30,7 @@ _MODEL_CONFIG = {
 }
 
 class PipelineFactory:
-    """Consists of a function for pipelines creating
+    """Consists of methods for pipelines creation
 
     Parameters
     ----------
@@ -40,9 +40,9 @@ class PipelineFactory:
     def __init__(self, ppl_config=None, model_config=None):
         self.config = _CONFIG.copy()
         self.model_config = _MODEL_CONFIG.copy()
-        self.update_config(ppl_config, model_config)
+        self._update_config(ppl_config, model_config)
 
-    def update_config(self, ppl_config=None, model_config=None):
+    def _update_config(self, ppl_config=None, model_config=None):
         """Get all parameters from ``config`` and update internal configs
 
         Parameters
@@ -85,7 +85,7 @@ class PipelineFactory:
         pipeline with action that make separate digits from images
         """
         make_ppl = (Pipeline()
-                    .crop_to_display()
+                    .crop_from_bbox()
                     .split_labels()
                     .split_to_digits(n_digits=self.config['n_digits']))
         make_ppl = make_ppl + Pipeline().resize(shape=shape) if shape is not None else make_ppl
@@ -131,7 +131,7 @@ class PipelineFactory:
         -------
         pipeline to train model
         """
-        self.update_config(ppl_config, model_config)
+        self._update_config(ppl_config, model_config)
         train_ppl = self.load_all(src) + self.make_digits(shape=shape)
         train_ppl += (Pipeline()
                       .init_variable('loss', init_on_each_run=list)
@@ -173,7 +173,7 @@ class PipelineFactory:
         -------
         pipeline to train model
         """
-        self.update_config(ppl_config)
+        self._update_config(ppl_config)
         pred_ppl = self.load_all(src) + self.make_digits(shape=shape)
         pred_ppl += (Pipeline()
                      .init_variable('prediction', init_on_each_run=list)

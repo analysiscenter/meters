@@ -25,7 +25,7 @@ class MeterBatch(ImagesBatch):
 
     @action
     @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
-    def crop_to_display(self, ix, src='images', dst='display'):
+    def crop_from_bbox(self, ix, src='images', dst='display'):
         """Crop area from image using ``coordinates`` attribute
 
         Parameters
@@ -60,7 +60,7 @@ class MeterBatch(ImagesBatch):
         batch.labels = self.labels.reshape(-1)
         numbers = np.array([None] * len(self.index))
         for i, image in enumerate(self.display):
-            # We add [None] because numpy can not automaticlly create an array with the object type.
+            # [None] is added because numpy can not automaticlly create an array with `object` type.
             numbers[i] = np.array([*np.array_split(image, n_digits, axis=1) + [None]])[:-1]
 
         batch.images = np.concatenate(numbers)
