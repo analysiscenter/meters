@@ -1,21 +1,21 @@
 #  pylint: disable=no-member
-"""File leading to one type of writing data in labels and coordinates files.
+"""Converts labels and data to the format used in the experiment.
 
-Note : You can't leading only coordinates, because it denended from right labels format.
+Note : It is not possible to convert only coordinates as they depend on the labels format.
 
 Arguments
 ---------
 -l : str
-    path to file with labels, include file name.csv
-
--ln : str
-    name of file with labels in new format
+    path to the file with labels, include file name.csv
 
 -c : str
-    path to file with coordinates, include file name.csv
+    path to the file with coordinates, include file name.csv
 
--nc : str
-    name of file with coordinates in new format
+-d : str
+    path to the file with labels and coordinates
+
+-s : str
+    name of the file with labels and coordinates
 """
 import os
 import re
@@ -25,25 +25,40 @@ import argparse
 import pandas as pd
 import numpy as np
 
-def format_data():
-    """Prepare labels in csv format to normal format"""
+def main():
+    """Convert labels and coordinates from csv to normal format. Normal is ambiguous format"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-l', '--labels', type=str, help='path to file with labels')
-    parser.add_argument('-nl', '--new_labels', type=str, help='file name labels in new format, \
-                                                               which will be save in the save path as old labels')
-    parser.add_argument('-c', '--coord', type=str, help='path to file with coordinates')
-    parser.add_argument('-nc', '--new_coord', type=str, help='file name with new coordinates, \
-                                                              which will be save in the save path as old coordinates')
+    parser.add_argument('-l', '--labels', type=str, help='path to the file with labels')
+    parser.add_argument('-c', '--coord', type=str, help='path to the file with coordinates')
+    parser.add_argument('-d', '--data', type=str, help='path to the file with all data (labels and coordinates)')
+    parser.add_argument('-s', '--save', type=str, help='Required argument. Name of the file where new labels and\
+                                                        coordinates are saved (folder is the same as for the file\
+                                                        with old labels or data)')
     args = parser.parse_args()
 
     if args.labels:
-        _format_labels(args.labels, args.new_labels)
+        labels = format_labels(args.labels)
 
     if args.coord:
-        labels_path = _create_new_path(args.labels, args.new_labels)
-        _format_coordinates(args.coord, labels_path, args.new_coord)
+        if args.labels is None:
+            raise ValueError("It is not possible to calculate new coordinates without 'labels'.\
+                             Use -l to add a file with labels.")
+        data = format_coordinates(args.coord, labels)
 
-def _format_labels(src, new_name):
+    if args.data:
+        data = format_data(args.data)
+
+    if args.save:
+        if args.save[-4:] != '.csv':
+            args.save += '.csv'
+        path = args.labels or args.data
+        path = os.path.join(os.path.split(path)[0], args.save)
+        pd.DataFrame.to_csv(data, path)
+    else:
+        raise ValueError("Missing required argument '-s'")
+
+def format_labels(src):
+    """Convert labels from csv to normat format"""
     try:
         labels = pd.read_csv(src, index_col='file_name', usecols=['file_name', 'counter_value'])
     except ValueError:
@@ -54,11 +69,10 @@ def _format_labels(src, new_name):
 
     labels = labels.loc[[name for name in labels.index.values if 'frame' not in name]]
     labels['counter_value'] = [lab.replace('.', ',') for lab in labels.counter_value.values]
-    path = _create_new_path(src, new_name)
-    pd.DataFrame.to_csv(labels, path)
+    return labels
 
-def _format_coordinates(src_coord, src_labels, new_name):
-    labels = pd.read_csv(src_labels, index_col='file_name')
+def format_coordinates(src_coord, labels):
+    """Convert coordinates from csv to normat format"""
     try:
         coord = pd.read_csv(src_coord, usecols=['numbers', 'markup']).dropna().reset_index()
     except ValueError:
@@ -71,18 +85,28 @@ def _format_coordinates(src_coord, src_labels, new_name):
     for i, string in enumerate(coord['markup']):
         list_coord = list([int(i) for i in re.sub('\\D+', ' ', string[36:-7]).split(' ')[1:]])
         numbers_coord.append([list_coord] * int(coord['numbers'].loc[i]))
-    new_coord = pd.DataFrame(index=labels.index,
-                             columns=['coordinates'],
-                             data=[str(i)[1:-1] for i in np.concatenate(np.array(numbers_coord))])
 
-    path = _create_new_path(src_coord, new_name)
-    pd.DataFrame.to_csv(new_coord, path)
+    data = pd.DataFrame(index=labels.index,
+                        columns=['coordinates', 'labels'],
+                        data=[[str(coord)[1:-1], label] for coord, label in
+                              zip(np.concatenate(np.array(numbers_coord)), labels['counter_value'].values)])
 
-def _create_new_path(src, name):
-    if name[-4:] != '.csv':
-        name += '.csv'
-    path = os.path.join(os.path.split(src)[0], name)
-    return path
+    return data
+
+def format_data(src_data):
+    """Convert data from csv to normat format"""
+    data = pd.read_csv(src_data)
+    cols = data.columns
+
+    numbers_coord = []
+    for string in data[cols[1]].values:
+        numbers_coord.append(list([int(i) for i in re.sub('\\D+', ' ', string[45:-7]).split(' ')[1:]]))
+    numbers_coord = np.array([str(coord)[1:-1] for coord in numbers_coord])
+
+    new_data = pd.DataFrame(index=data[cols[0]],
+                            columns=['coordinates', 'labels'],
+                            data=list(zip(np.array(numbers_coord), data[cols[-1]].values)))
+    return new_data
 
 if __name__ == "__main__":
-    sys.exit(format_data())
+    sys.exit(main())
