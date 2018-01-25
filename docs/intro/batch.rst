@@ -6,7 +6,7 @@ This module stores batch class for preprocessing meters images.
 MeterBatch
 -----------
 
-`MeterBatch` is the main class that defines how to store images and contains all actions to preprocessing.
+`MeterBatch` is the main class that defines how to store images and contains all actions for preprocessing.
 
 Attributes of MeterBatch:
 
@@ -38,7 +38,7 @@ If you want to work with MeterBatch you need to create a pipeline object::
         .load(src=src, fmt='blosc', components='images')
         .load(src='path/to/labels', fmt='csv', components='labels', index_col='file_name'))
         .load(src='path/to/coordinates', fmt='csv', components='coordinates', index_col='file_name')
-        .crop_to_display()
+        .crop_from_bbox()
         .split_labels()
         .split_to_digits()
     )

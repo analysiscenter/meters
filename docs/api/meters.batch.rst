@@ -18,5 +18,5 @@ Hidden methods
 Batch processing
 ^^^^^^^^^^^^^^^^
     .. automethod:: meters.batch.MeterBatch.split_to_digits
-    .. automethod:: meters.batch.MeterBatch.crop_to_display
+    .. automethod:: meters.batch.MeterBatch.crop_from_bbox
     .. automethod:: meters.batch.MeterBatch.split_labels

@@ -6,7 +6,7 @@ Main features:
 
 * convert images to blosc format
 * load images(from blosc) and labels (from csv)
-* crop to display, split display and labels to separate numbers
+* separate numbers (and labels respectively) from cropped area with meter's value
 * arrange new custom actions into pipeline
 * easily configure pipeline
 * build, train and test custom models for research.
@@ -20,18 +20,18 @@ Meters has two module: [``batch``](https://github.com/analysiscenter/meters/tree
 ``pipelines`` module contains PipelineFactory class that builds pipelines for:
   
   * tarining simple models to classify digits on meters
-  * making predictions with trained model.
+  * making predictions by trained model.
 
 # Basic usage
 
-Here is an example of pipeline that loads blosc images, makes preprocessing and trains a model for 50 epochs:
+Here is an example of a pipeline that loads blosc images, makes preprocessing and trains a model for 50 epochs:
 ```python
 ppl = (
     dataset.train
     .load(src=src, fmt='blosc', components='images')
     .load(src='path/to/labels', fmt='csv', components='labels', index_col='file_name')
     .load(src='path/to/coordinates', fmt='csv', components='coordinates', index_col='file_name')
-    .crop_to_display()
+    .crop_from_bbox()
     .split_labels()
     .split_to_digits()
     .init_model('dynamic', MeterModel, 'meter_model', config=model_config)
