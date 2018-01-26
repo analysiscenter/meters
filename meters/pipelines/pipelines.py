@@ -3,31 +3,36 @@ import numpy as np
 
 from ..dataset.dataset import Pipeline, V, B
 
-_CONFIG = {
-    'n_digits': 8,
-    'model_type': 'dynamic',
-    'mode': 'a',
-    'task': 'classification',
-    'shape': np.array([64, 32, 3]),
-    'model': None,
-    'model_name': None,
-    'fetches': 'output_accuracy',
-    'batch_size': 1,
-    'n_epochs': None,
-    'shuffle': True,
-    'drop_last': True
-}
 
-_MODEL_CONFIG = {
-    'inputs': {'images': {'shape': (64, 32, 3)},
-               'labels': {'classes': (10),
-                          'transform': 'ohe',
-                          'name': 'targets'}},
-    'optimizer': 'Adam',
-    'loss': 'ce',
-    'input_block/inputs': 'images',
-    'output': dict(ops=['labels', 'proba', 'accuracy'])
-}
+def default_config():
+    """create default config"""
+    return {
+        'n_digits': 8,
+        'model_type': 'dynamic',
+        'mode': 'a',
+        'task': 'classification',
+        'shape': np.array([64, 32, 3]),
+        'model': None,
+        'model_name': None,
+        'fetches': 'output_accuracy',
+        'batch_size': 1,
+        'n_epochs': None,
+        'shuffle': True,
+        'drop_last': True
+    }
+
+def default_model_config():
+    """Create default model config"""
+    return {
+        'inputs': {'images': {'shape': (64, 32, 3)},
+                   'labels': {'classes': (10),
+                              'transform': 'ohe',
+                              'name': 'targets'}},
+        'optimizer': 'Adam',
+        'loss': 'ce',
+        'input_block/inputs': 'images',
+        'output': dict(ops=['labels', 'proba', 'accuracy'])
+    }
 
 class PipelineFactory:
     """Consists of methods for pipelines creation
@@ -38,8 +43,8 @@ class PipelineFactory:
         configuraton of pipeline and model
     """
     def __init__(self, ppl_config=None, model_config=None):
-        self.config = _CONFIG.copy()
-        self.model_config = _MODEL_CONFIG.copy()
+        self.config = default_config()
+        self.model_config = default_model_config()
         self._update_config(ppl_config, model_config)
 
     def _update_config(self, ppl_config=None, model_config=None):
