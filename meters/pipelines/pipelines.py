@@ -35,7 +35,7 @@ class PipelineFactory:
     Parameters
     ----------
     config : dict
-        configuraton for pipeline and model
+        configuraton of pipeline and model
     """
     def __init__(self, ppl_config=None, model_config=None):
         self.config = _CONFIG.copy()
@@ -48,41 +48,41 @@ class PipelineFactory:
         Parameters
         ----------
         config : dict
-            configuration to pipeline
+            configuration of a pipeline
         """
         self.config.update(ppl_config if ppl_config is not None else '')
         self.model_config.update(model_config if model_config is not None else '')
 
     def load_all(self, src):
         """Load data from path with certain format.
-        Standard path to images is ``src`` + '/images', for labels is ``src`` + '/labels/labels.csv'(coord.csv)
+        Standard path to images is ``src + '/images'``, for labels and coordinates is ``src + '/labels/data.csv'``
 
-        For images format is `blocs` and 'images' as the name of the component.
-        For labels and coordinates format is `csv` and 'labels' and 'coordinates' as names of components.
+        Format of the images must be `blosc`. Images will be saved as 'images' component.
+
+        Format of the targets must be `csv`. Labels and coordinates will be saved as 'labels' and 'coordinates'
+        components.
 
         Parameters
         ----------
         src : str
-            path to data
+            path to files with images and labels
         Returns
         -------
         pipeline with load functions
         """
         path_to_images = src + '/images'
-        path_to_labels = src + '/labels/labels.csv'
-        path_to_coord = src + '/labels/coord.csv'
+        path_to_data = src + '/labels/data.csv'
         load_ppl = (Pipeline()
                     .load(path_to_images, fmt='blosc', components='images')
-                    .load(path_to_labels, fmt='csv', components='labels', index_col='file_name')
-                    .load(path_to_coord, fmt='csv', components='coordinates', index_col='file_name'))
+                    .load(path_to_data, fmt='csv', components=['coordinates', 'labels'], index_col='file_name'))
         return load_ppl
 
     def make_digits(self, shape=None):
-        """Сrop images by ``coordinates`` and extracts digits from them
+        """Сrop images by ``coordinates`` and extract digits from them
 
         Returns
         -------
-        pipeline with action that make separate digits from images
+        pipeline with action that makes separate digits from images
         """
         make_ppl = (Pipeline()
                     .crop_from_bbox()
@@ -117,12 +117,12 @@ class PipelineFactory:
         * load + make
         * init model
         * train model
-        * saving the loss value at each iteration.
+        * save loss value at each iteration.
 
         Parameters
         ----------
         src : str
-            path to data
+            path to files with images and labels
         model_config : dict
             model's config
         ppl_config : dict
@@ -162,7 +162,7 @@ class PipelineFactory:
         Parameters
         ----------
         src : str
-            path to data
+            path to files with images and labels
         model_name : str
             name of the model in pipeline
         pipeline
