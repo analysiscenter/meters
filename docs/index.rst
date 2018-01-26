@@ -20,9 +20,10 @@ Meters has two module: :doc:`batch <./api/meters.batch>` and :doc:`pipelines <./
 
 ``pipelines`` module contains PipelineFactory class that builds pipelines for:
 
-  * tarining simple models to classify digits on meters
+  * training simple models to classify digits on meters
   * making predictions by trained model.
 
+Contents
 =========
 .. toctree::
    :maxdepth: 2
@@ -38,8 +39,7 @@ Here is an example of a pipeline that loads blosc images, makes preprocessing an
   ppl = (
       dataset.train
       .load(src=src, fmt='blosc', components='images')
-      .load(src='path/to/labels', fmt='csv', components='labels', index_col='file_name')
-      .load(src='path/to/coordinates', fmt='csv', components='coordinates', index_col='file_name')
+      .load(src='path/to/data.csv', fmt='csv', components=['coordinates', 'labels'], index_col='file_name')
       .crop_from_bbox()
       .split_labels()
       .split_to_digits()

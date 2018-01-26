@@ -15,5 +15,5 @@ Methods for creating a pipeline
 Secondary methods
 ^^^^^^^^^^^^^^^^^
 
-	.. automethod:: meters.pipelines.PipelineFactory.update_config
+	.. automethod:: meters.pipelines.PipelineFactory._update_config
 	.. automethod:: meters.pipelines.PipelineFactory.add_lazy_run

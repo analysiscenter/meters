@@ -36,8 +36,7 @@ If you want to work with MeterBatch you need to create a pipeline object::
     template_ppl = (
         Pipeline()
         .load(src=src, fmt='blosc', components='images')
-        .load(src='path/to/labels', fmt='csv', components='labels', index_col='file_name'))
-        .load(src='path/to/coordinates', fmt='csv', components='coordinates', index_col='file_name')
+        .load(src='path/to/data.csv', fmt='csv', components=['coordinates', 'labels'], index_col='file_name')
         .crop_from_bbox()
         .split_labels()
         .split_to_digits()
