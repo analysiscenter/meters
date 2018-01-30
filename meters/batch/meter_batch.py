@@ -33,9 +33,9 @@ class MeterBatch(ImagesBatch):
         ix : str or int
             dataset's index
         src : str
-            data placeholder's name
+            data component's name
         dst : str
-            the name of the placeholder's in witch the result will be recorded
+            the name of the component where the result will be recorded
         """
         image = self.get(ix, src)
         coord_str = self.get(ix, 'coordinates')
@@ -46,7 +46,7 @@ class MeterBatch(ImagesBatch):
 
     @action
     def split_to_digits(self, n_digits=8):
-        """Crop image with ``n_digits`` number s to ``n_digits`` images with one number
+        """Split image with ``n_digits`` numbers to ``n_digits`` images each with one number
 
         Parameters
         ----------
@@ -76,7 +76,7 @@ class MeterBatch(ImagesBatch):
         ix : str or int
             dataset's index
         src : str
-            the name of the placeholder's with data
+            the name of the component with data
         Returns
         -------
         array with int digits

@@ -64,8 +64,8 @@ class PipelineFactory:
 
         Format of the images must be `blosc`. Images will be saved as 'images' component.
 
-        Format of the targets must be `csv`. Labels and coordinates will be saved as 'labels' and 'coordinates'
-        components.
+        Labels and coordinates are expected to be loaded from csv file. Labels and coordinates will be saved as
+        'labels' and 'coordinates' components.
 
         Parameters
         ----------
