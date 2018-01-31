@@ -5,7 +5,7 @@ import numpy as np
 from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed, DatasetIndex
 
 class MeterBatch(ImagesBatch):
-    """Class to create meters' batch"""
+    """Batch class for meters"""
     components = 'images', 'labels', 'coordinates', 'indices'
 
     def _init_component(self, **kwargs):
@@ -26,16 +26,18 @@ class MeterBatch(ImagesBatch):
     @action
     @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
     def crop_from_bbox(self, ix, src='images', dst='display'):
-        """Crop area from image using ``coordinates`` attribute
+        """Crop area from an image using ``coordinates`` attribute
 
         Parameters
         ----------
-        ix : str or int
-            dataset's index
         src : str
             data component's name
         dst : str
             the name of the component where the result will be recorded
+
+        Returns
+        -------
+        self
         """
         image = self.get(ix, src)
         coord_str = self.get(ix, 'coordinates')
@@ -52,9 +54,10 @@ class MeterBatch(ImagesBatch):
         ----------
         n_digits : int
             number of digits on meter
-        Return
+
+        Returns
         ------
-        a new instance of ImagesBatch class
+        self
         """
         batch = ImagesBatch(DatasetIndex(np.arange(len(self.labels.reshape(-1)))))
         batch.labels = self.labels.reshape(-1)
@@ -69,17 +72,16 @@ class MeterBatch(ImagesBatch):
     @action
     @inbatch_parallel(init='indices', post='assemble', src='labels', components='labels')
     def split_labels(self, ix, src='labels'):
-        """Splited labels from strig to list with separate numbers
+        """Splits labels from strig to list with separate numbers
 
         Parameters
         ----------
-        ix : str or int
-            dataset's index
         src : str
             the name of the component with data
+
         Returns
         -------
-        array with int digits
+        self
         """
         i = self.get_pos(None, src, ix)
         label = getattr(self, src)[i]
@@ -93,10 +95,11 @@ class MeterBatch(ImagesBatch):
         ----------
         results : list
             Post function computation results.
+
         Raises
         ------
         RuntimeError
-            If any paralleled action raised an ``Exception``.
+            If any paralleled action raised an exception.
         """
         if any_action_failed(results):
             all_errors = self.get_errors(results)
@@ -109,6 +112,7 @@ class MeterBatch(ImagesBatch):
         ----------
         results : array
             loaded data
+
         Returns
         -------
         self

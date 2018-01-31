@@ -5,7 +5,7 @@ from ..dataset.dataset import Pipeline, V, B
 
 
 def default_config():
-    """create default config"""
+    """Create default config for pipeline"""
     return {
         'n_digits': 8,
         'model_type': 'dynamic',
@@ -40,7 +40,10 @@ class PipelineFactory:
     Parameters
     ----------
     config : dict
-        configuraton of pipeline and model
+        configuraton of the pipeline
+
+    model_config : dict
+        configuraton of the model
     """
     def __init__(self, ppl_config=None, model_config=None):
         self.config = default_config()
@@ -70,10 +73,7 @@ class PipelineFactory:
         Parameters
         ----------
         src : str
-            path to files with images and labels
-        Returns
-        -------
-        pipeline with load functions
+            path to the folder with images and labels
         """
         path_to_images = src + '/images'
         path_to_data = src + '/labels/data.csv'
@@ -84,6 +84,11 @@ class PipelineFactory:
 
     def make_digits(self, shape=None):
         """Сrop images by ``coordinates`` and extract digits from them
+
+        Parameters
+        ----------
+        shape : tuple or list
+            shape of the input images (original images will be resized if their shape is different)
 
         Returns
         -------
@@ -103,7 +108,8 @@ class PipelineFactory:
         Parameters
         ----------
         ppl
-            Dataset pipeline
+            dataset pipeline
+
         Returns
         -------
         Lazy run pipeline
@@ -127,11 +133,14 @@ class PipelineFactory:
         Parameters
         ----------
         src : str
-            path to files with images and labels
+            path to the folder with images and labels
+        shape : tuple or list
+            shape of the input images (original images will be resized if their shape is different)
         model_config : dict
             model's config
         ppl_config : dict
             config for pipeline
+
         Returns
         -------
         pipeline to train model
@@ -167,13 +176,16 @@ class PipelineFactory:
         Parameters
         ----------
         src : str
-            path to files with images and labels
+            path to the folder with images and labels
+        shape : tuple or list
+            shape of the input images (original images will be resized if their shape is different)
         model_name : str
             name of the model in pipeline
         pipeline
             Dataset pipeline
         config : dict
             configuration dict for pipeline
+
         Returns
         -------
         pipeline to train model

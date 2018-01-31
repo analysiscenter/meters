@@ -26,7 +26,7 @@ import pandas as pd
 import numpy as np
 
 def main():
-    """Convert labels and coordinates from csv to normal format. Normal is ambiguous format"""
+    """Convert labels and coordinates from csv the format used in the experiment"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--labels', type=str, help='path to the file with labels')
     parser.add_argument('-c', '--coord', type=str, help='path to the file with coordinates')
@@ -58,7 +58,7 @@ def main():
         raise ValueError("Missing required argument '-s'")
 
 def format_labels(src):
-    """Convert labels from csv to normat format"""
+    """Convert labels from csv to the format used in the experiment."""
     try:
         labels = pd.read_csv(src, index_col='file_name', usecols=['file_name', 'counter_value'])
     except ValueError:
@@ -72,7 +72,7 @@ def format_labels(src):
     return labels
 
 def format_coordinates(src_coord, labels):
-    """Convert coordinates from csv to normat format"""
+    """Convert coordinates from csv to the format used in the experiment."""
     try:
         coord = pd.read_csv(src_coord, usecols=['numbers', 'markup']).dropna().reset_index()
     except ValueError:
@@ -94,7 +94,7 @@ def format_coordinates(src_coord, labels):
     return data
 
 def format_data(src_data):
-    """Convert data from csv to normat format"""
+    """Convert data from csv to the format used in the experiment."""
     data = pd.read_csv(src_data)
     cols = data.columns
 
