@@ -14,7 +14,7 @@ Main features:
 
 .. note:: Meters is based on `Dataset <https://github.com/analysiscenter/dataset>`_. You may benefit from reading `its documentation <https://analysiscenter.github.io/dataset>`_. However, it is not required, especially in the beginning.
 
-Meters has two module: :doc:`batch <./api/meters.batch>` and :doc:`pipelines <./api/meters.pipelines>`
+Meters has two modules: :doc:`batch <./api/meters.batch>` and :doc:`pipelines <./api/meters.pipelines>`
 
 ``batch`` module contains MeterBatch class which includes actions for preprocessing.
 

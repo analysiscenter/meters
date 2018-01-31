@@ -13,7 +13,7 @@ Main features:
 
 # About Meters
 
-Meters has two module: [``batch``](https://github.com/analysiscenter/meters/tree/master/meters/batch) and [``pipelines``](https://github.com/analysiscenter/meters/tree/master/meters/pipelines)
+Meters has two modules: [``batch``](https://github.com/analysiscenter/meters/tree/master/meters/batch) and [``pipelines``](https://github.com/analysiscenter/meters/tree/master/meters/pipelines)
 
 ``batch`` module contains MeterBatch class which includes actions for preprocessing.
 

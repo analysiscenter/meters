@@ -89,17 +89,17 @@ class MeterBatch(ImagesBatch):
         return more_label
 
     def _reraise_exceptions(self, results):
-        """Reraise all exceptions in the ``results`` list.
+        """Reraise all exceptions in the ``results`` list
 
         Parameters
         ----------
         results : list
-            Post function computation results.
+            Post function computation results
 
         Raises
         ------
         RuntimeError
-            If any paralleled action raised an exception.
+            If any paralleled action raised an exception
         """
         if any_action_failed(results):
             all_errors = self.get_errors(results)

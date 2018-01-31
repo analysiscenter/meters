@@ -112,7 +112,7 @@ class PipelineFactory:
 
         Returns
         -------
-        Lazy run pipeline
+        lazy run pipeline
         """
         return ppl.run(self.config['batch_size'],
                        n_epochs=self.config['n_epochs'],
@@ -166,7 +166,7 @@ class PipelineFactory:
     def simple_predict(self, src, model_name, pipeline, shape=(64, 32), ppl_config=None):
         """Create simple predict pipeline with lazy run at the end.
 
-        Simple train includes:
+        Simple predict includes:
 
         * laod + make
         * import model
@@ -188,7 +188,7 @@ class PipelineFactory:
 
         Returns
         -------
-        pipeline to train model
+        pipeline to predict model
         """
         self._update_config(ppl_config)
         pred_ppl = self.load_all(src) + self.make_digits(shape=shape)

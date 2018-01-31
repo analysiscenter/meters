@@ -12,15 +12,15 @@ Attributes of MeterBatch:
 
 * ``images``, input images
 * ``labels``, targets for images - array of strings with numbers
-* ``coordinates``, array with four numbers - coordinates of one of the top left corner of the bbox, height and width
-* ``display``, array with images cropped by ``coordinates``
+* ``coordinates``, array with four numbers - coordinates of the top-left corner, height and width of the bounding box
+* ``display``, array with cropped bounding boxes' areas from images
 * ``digits``, array with ``num_split`` numbers from the meter.
 
-Actions of MeterBatch allows to e.g.:
+Actions of MeterBatch allows to:
 
 * load images from blosc formats and labels from csv format
-* crop images by coordinates
-* split display on separate numbers
+* crop bounding box's area from an image
+* split meter's value to separate digits
 
 Usage
 -----
