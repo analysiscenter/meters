@@ -49,7 +49,7 @@ def compress():
         impath = os.path.join(path_from, imfile)
         if not os.path.isdir(impath):
             image = plt.imread(impath)
-            image_path = os.path.join(path_to, imfile[:-4])
+            image_path = os.path.join(path_to, imfile[:imfile.rfind('.')])
             with open(image_path + '.blosc', 'w+b') as file_blosc:
                 data = dict(zip(component, (image,)))
                 file_blosc.write(blosc.compress(dill.dumps(data)))
