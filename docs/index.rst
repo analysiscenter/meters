@@ -52,7 +52,7 @@ Installation
 =============
 With `git clone <https://git-scm.com/docs/git-clone/>`_::
 
-    git clone https://github.com/analysiscenter/meters.git
+    git clone --recursive https://github.com/analysiscenter/meters.git
 
 If your python file is located in another directory, you might need to add a path to `meters` submodule location::
 

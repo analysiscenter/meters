@@ -33,7 +33,7 @@ def main():
     parser.add_argument('-d', '--data', type=str, help='path to the file with all data (labels and coordinates)')
     parser.add_argument('-s', '--save', type=str, help='Required argument. Name of the file where new labels and\
                                                         coordinates are saved (folder is the same as for the file\
-                                                        with old labels or data)')
+                                                        with old labels or data)', required=True)
     args = parser.parse_args()
 
     if args.labels:
@@ -51,22 +51,30 @@ def main():
     if args.save:
         if args.save[-4:] != '.csv':
             args.save += '.csv'
+
         path = args.labels or args.data
         path = os.path.join(os.path.split(path)[0], args.save)
+
+        folder_path = [os.path.join(folder_name) for folder_name in os.path.split(path)[:-1]][0]
+        folder_path = '.' if folder_path == '' else folder_path
+
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
         pd.DataFrame.to_csv(data, path)
     else:
         raise ValueError("Missing required argument '-s'")
 
+
 def format_labels(src):
     """Convert labels from csv to the format used in the experiment."""
+
     try:
         labels = pd.read_csv(src, index_col='file_name', usecols=['file_name', 'counter_value'])
     except ValueError:
         bad_labels = pd.read_csv(src)
         cols = bad_labels.columns
-        labels = pd.DataFrame(data=bad_labels[cols[3]].values, index=bad_labels[cols[2]].values,    # pylint: disable=redefined-variable-type
+        labels = pd.DataFrame(data=bad_labels[cols[-1]].values, index=bad_labels[cols[-2]].values,    # pylint: disable=redefined-variable-type
                               columns=['counter_value'])
-
     labels = labels.loc[[name for name in labels.index.values if 'frame' not in name]]
     labels['counter_value'] = [lab.replace('.', ',') for lab in labels.counter_value.values]
     return labels
@@ -85,7 +93,6 @@ def format_coordinates(src_coord, labels):
     for i, string in enumerate(coord['markup']):
         list_coord = list([int(i) for i in re.sub('\\D+', ' ', string[36:-7]).split(' ')[1:]])
         numbers_coord.append([list_coord] * int(coord['numbers'].loc[i]))
-
     data = pd.DataFrame(index=labels.index,
                         columns=['coordinates', 'labels'],
                         data=[[str(coord)[1:-1], label] for coord, label in
@@ -95,15 +102,18 @@ def format_coordinates(src_coord, labels):
 
 def format_data(src_data):
     """Convert data from csv to the format used in the experiment."""
+
     data = pd.read_csv(src_data)
     cols = data.columns
 
     numbers_coord = []
     for string in data[cols[1]].values:
         numbers_coord.append(list([int(i) for i in re.sub('\\D+', ' ', string[45:-7]).split(' ')[1:]]))
-    numbers_coord = np.array([str(coord)[1:-1] for coord in numbers_coord])
+    numbers_coord = np.array([str(coord)[1:-1].replace(',', '') for coord in numbers_coord])
 
-    new_data = pd.DataFrame(index=data[cols[0]],
+    data.columns = ['file_name'] + list(data.columns[1:])
+    data['file_name'] = ['a' + '0' * (5 - len(str(d))) + str(d) for d in data[data.columns[0]].values]
+    new_data = pd.DataFrame(index=data['file_name'],
                             columns=['coordinates', 'labels'],
                             data=list(zip(np.array(numbers_coord), data[cols[-1]].values)))
     return new_data
