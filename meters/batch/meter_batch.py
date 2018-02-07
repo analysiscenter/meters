@@ -3,13 +3,83 @@
 import numpy as np
 import scipy as sp
 
+from time import time
+
 from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed, DatasetIndex
 from ..dataset.dataset.batch_image import transform_actions
+
+def iou(boxA, boxB):
+    # determine the (x, y)-coordinates of the intersection rectangle
+    xA = max(boxA[0], boxB[0])
+    yA = max(boxA[1], boxB[1])
+    xB = min(boxA[2], boxB[2])
+    yB = min(boxA[3], boxB[3])
+
+    # compute the area of intersection rectangle
+    interArea = max(0, (xB - xA)) * max(0, (yB - yA))
+
+    # compute the area of both the prediction and ground-truth
+    # rectangles
+    boxAArea = max(0,(boxA[2] - boxA[0])) * max(0,(boxA[3] - boxA[1]))
+    boxBArea = max(0,(boxB[2] - boxB[0])) * max(0,(boxB[3] - boxB[1]))
+
+    # compute the intersection over union by taking the intersection
+    # area and dividing it by the sum of prediction + ground-truth
+    # areas - the interesection area
+    iou = interArea / float(boxAArea + boxBArea - interArea + 1e-10)
+
+    # return the intersection over union value
+    return iou
 
 @transform_actions(prefix='_', suffix='_', wrapper='apply_transform')
 class MeterBatch(ImagesBatch):
     """Batch class for meters"""
     components = 'images', 'labels', 'coordinates', 'indices'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._time_stamps = {}
+
+
+
+    def _normalize_bb_(self, image, bbox, **kwargs):
+        bbox /= np.tile(self._get_image_shape(image)[::-1], 2)
+        return image, bbox
+
+    @action
+    def record_time(self, stat_name='statistics', mode='record'):
+        """
+        Make a time stamp or record the difference between the previous
+        one for a specified list in the pipeline
+
+        Parameters
+        ----------
+        stat_name : str
+                    name of the statistics in the pipeline for which the operation is conducted
+        mode : {'record', 'diff'}
+               if 'record' is given then the current time is recorded with the handler specified by `stat_name`
+               if 'diff' is given then the difference between the current time and the last recorded time for
+               the given handler (`stat_name`) is appended to `stat_name` in the pipeline
+
+        Returns
+        -------
+        self : MNISTBatchTime
+
+        """
+        if mode == 'record':
+            self._time_stamps[stat_name] = time()
+#             if stat_name == 'resize_time':
+#             print('record', stat_name, self._time_stamps)
+        elif mode == 'diff':
+#             if stat_name == 'resize_time':
+            # print('diff', stat_name, time()-self._time_stamps[stat_name])
+            self.pipeline.set_variable(
+                stat_name,
+                time()-self._time_stamps[stat_name],
+                mode='append')
+#             if stat_name == 'resize_time':
+#                 print('array',self.pipeline.get_variable(stat_name))
+        return self
 
     def _init_component(self, **kwargs):
         """Create a new attribute with the name specified by ``kwargs['dst']``,
@@ -26,7 +96,31 @@ class MeterBatch(ImagesBatch):
             setattr(self, dst, np.array([None] * len(self.index)))
         return self.indices
 
-    def _convert_bbox_(self, bbox):
+
+    @action
+    def debug(self, *args, **kwargs):
+        images = self.get(None, 'images')
+        print(images.shape)
+        return self
+
+    @action
+    def iou(self, mode='set',**kwargs):
+        iou_ = 0
+        predictions = self.pipeline.get_variable('predictions')
+        for i in range(len(self)):
+            boxA, boxB = self.coordinates[i].copy(), predictions[i].copy()
+            boxA[[2,3]] = np.maximum(0., boxA[[2,3]])
+            boxB[[2,3]] = np.maximum(0., boxB[[2,3]])
+            boxA[2] += boxA[0]
+            boxA[3] += boxA[1]
+            boxB[2] += boxB[0]
+            boxB[3] += boxB[1]
+            iou_ += iou(boxA, boxB)
+        self.pipeline.set_variable('current_iou', iou_ / len(self), mode=mode)
+
+        return self
+
+    def _convert_bbox_(self, bbox, sep=', '):
         """ Convert bounding box's coordinates to ``int``.
 
         Parameters
@@ -41,7 +135,12 @@ class MeterBatch(ImagesBatch):
         self
         """
 
-        return [int(x) for x in bbox.split(', ')]
+        return np.array([float(x) for x in bbox.split(sep)])
+
+
+    def _resize_bb_only_(self, bbox, original_shape, shape, **kwargs):
+        factor = np.asarray(shape) / np.asarray(original_shape)
+        return bbox * np.tile(factor[::-1], 2)
 
     def _resize_bb_(self, image, bbox, shape, **kwargs):
         """ Resizes an image.
@@ -65,29 +164,7 @@ class MeterBatch(ImagesBatch):
         factor = np.asarray(shape) / np.asarray(self._get_image_shape(image))
         return super()._resize_(image, shape, **kwargs), bbox * np.tile(factor[::-1], 2)
 
-    def _remove_background_(self, image):
-        """ Removes white stripes from the edges of an image.
 
-        Parameters
-        ----------
-        src : str
-            Component to get images from. Default is 'images'.
-        dst : str
-            Component to write images to. Default is 'images'.
-
-        Returns
-        -------
-        self
-        """
-
-        rows_mean, columns_mean = image.mean((0, 2)), image.mean((1, 2))
-        rows_nonwhite = np.argwhere(columns_mean < 255)
-        columns_nonwhite = np.argwhere(rows_mean < 255)
-
-        left_top = (rows_nonwhite[0][0], columns_nonwhite[0][0])
-        right_bottom = (rows_nonwhite[-1][0]+1, columns_nonwhite[-1][0]+1)
-
-        return image[left_top[0]:right_bottom[0], left_top[1]:right_bottom[1]].copy()
 
     def _affine_transform_(self, image, bbox, matrix, *args, **kwargs):
         """ Perfoms affine transformation.
@@ -109,21 +186,23 @@ class MeterBatch(ImagesBatch):
         self
         """
 
-        bbox=bbox.copy()
+        new_bbox=bbox.copy()
 
-        left_top = np.linalg.solve(matrix, (bbox[1], bbox[0], 0, 1))[:2]
-        left_bottom = np.linalg.solve(matrix, (bbox[1]+bbox[3], bbox[0], 0, 1))[:2]
-        right_top = np.linalg.solve(matrix, (bbox[1], bbox[0]+bbox[2], 0, 1))[:2]
-        right_bottom = np.linalg.solve(matrix, (bbox[1]+bbox[3], bbox[0]+bbox[2], 0, 1))[:2]
+        left_top = np.linalg.solve(matrix, (new_bbox[1], new_bbox[0], 0, 1))[:2]
+        left_bottom = np.linalg.solve(matrix, (new_bbox[1]+new_bbox[3], new_bbox[0], 0, 1))[:2]
+        right_top = np.linalg.solve(matrix, (new_bbox[1], new_bbox[0]+new_bbox[2], 0, 1))[:2]
+        right_bottom = np.linalg.solve(matrix, (new_bbox[1]+new_bbox[3], new_bbox[0]+new_bbox[2], 0, 1))[:2]
 
         right_bottom_bb = np.zeros(2)
 
         for i in (0, 1):
-            bbox[1-i] = min(left_top[i], left_bottom[i], right_bottom[i], right_top[i])
+            new_bbox[1-i] = min(left_top[i], left_bottom[i], right_bottom[i], right_top[i])
             right_bottom_bb[1-i] = max(left_top[i], left_bottom[i], right_bottom[i], right_top[i])
-        bbox[2], bbox[3] = right_bottom_bb - bbox[:2]
+        new_bbox[2], new_bbox[3] = right_bottom_bb - new_bbox[:2]
 
-        return super()._affine_transform_(image, matrix=matrix, *args, **kwargs), bbox
+        if new_bbox[0] < 0 or new_bbox[1] < 0:
+            return image, bbox
+        return super()._affine_transform_(image, matrix=matrix, *args, **kwargs), new_bbox
 
     def _rotate_(self, image, bbox, angle, **kwargs):
         """ Rotates an image
@@ -169,8 +248,10 @@ class MeterBatch(ImagesBatch):
         -------
         self
         """
-
-        return super()._shift_(image, shift), np.r_[np.array(bbox[:2]) + shift[1::-1], bbox[2:]]
+        new_bbox = np.r_[np.array(bbox[:2]) + shift[1::-1], bbox[2:]]
+        if new_bbox[0] < 0 or new_bbox[1] < 0:
+            return image, bbox
+        return super()._shift_(image, shift, **kwargs), new_bbox
 
     def _scale_(self, image, bbox, factor, preserve_shape, **kwargs):
         """ Scale the content of each image in the batch.
