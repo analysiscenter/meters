@@ -6,7 +6,7 @@ from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_
 
 class MeterBatch(ImagesBatch):
     """Batch class for meters"""
-    components = 'images', 'labels', 'coordinates', 'indices'
+    components = 'full_images', 'images', 'labels', 'coordinates', 'indices', 'pred_coordinates'
 
     def _init_component(self, **kwargs):
         """Create a new attribute with the name specified by ``kwargs['dst']``,
@@ -24,8 +24,24 @@ class MeterBatch(ImagesBatch):
         return self.indices
 
     @action
+    @inbatch_parallel(init='indices', src='images', post='assemble')
+    def normalize_images(self, ix, src='images'):
+        """ Normalize pixel values to (0, 1). """
+        image = self.get(ix, src)
+        image /= 255.
+        return image
+
+    @action
+    @inbatch_parallel(init='indices', post='assemble', components='pred_coordinates')
+    def get_global_coordinates(self, ix, src='pred_coordinates', img='images'):
+        """global coordinates"""
+        coordinates = self.get(ix, src)
+        images = self.get(ix, img).shape[::-1] * 2
+        return [coord * img for coord, img in zip(coordinates, images)]
+
+    @action
     @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
-    def crop_from_bbox(self, ix, src='images', dst='display'):
+    def crop_from_bbox(self, ix, src='images', dst='display', comp_coord='coordinates'):
         """Crop area from an image using ``coordinates`` attribute
 
         Parameters
@@ -40,7 +56,7 @@ class MeterBatch(ImagesBatch):
         self
         """
         image = self.get(ix, src)
-        coord_str = self.get(ix, 'coordinates')
+        coord_str = self.get(ix, comp_coord)
         x, y, width, height = list(map(int, coord_str.split()))
         i = self.get_pos(None, src, ix)
         dst_data = image[y:y+height, x:x+width].copy()
