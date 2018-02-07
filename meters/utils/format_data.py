@@ -94,9 +94,9 @@ def format_coordinates(src_coord, labels):
         list_coord = list([int(i) for i in re.sub('\\D+', ' ', string[36:-7]).split(' ')[1:]])
         numbers_coord.append([list_coord] * int(coord['numbers'].loc[i]))
     data = pd.DataFrame(index=labels.index,
-                        columns=['coordinates', 'labels'],
-                        data=[[str(coord)[1:-1], label] for coord, label in
-                              zip(np.concatenate(np.array(numbers_coord)), labels['counter_value'].values)])
+                        columns=['x', 'y', 'h', 'w', 'labels'],
+                        data=[[*coord, label] for coord, label in
+                              zip(np.concatenate(numbers_coord), labels['counter_value'].values)])
 
     return data
 
@@ -109,13 +109,13 @@ def format_data(src_data):
     numbers_coord = []
     for string in data[cols[1]].values:
         numbers_coord.append(list([int(i) for i in re.sub('\\D+', ' ', string[45:-7]).split(' ')[1:]]))
-    numbers_coord = np.array([str(coord)[1:-1].replace(',', '') for coord in numbers_coord])
 
     data.columns = ['file_name'] + list(data.columns[1:])
     data['file_name'] = ['a' + '0' * (5 - len(str(d))) + str(d) for d in data[data.columns[0]].values]
     new_data = pd.DataFrame(index=data['file_name'],
-                            columns=['coordinates', 'labels'],
-                            data=list(zip(np.array(numbers_coord), data[cols[-1]].values)))
+                            columns=['x', 'y', 'h', 'w', 'labels'],
+                            data=[[*coord, label] for coord, label in
+                                  list(zip(np.array(numbers_coord), data[cols[-1]].values))])
     return new_data
 
 if __name__ == "__main__":
