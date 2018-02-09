@@ -1,9 +1,14 @@
 # pylint: disable=attribute-defined-outside-init
 """Batch class for water meter task"""
+from numbers import Number
+from time import time
+
 import numpy as np
 import scipy as sp
 
-from time import time
+from imageio import imwrite
+
+
 
 from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed, DatasetIndex
 from ..dataset.dataset.batch_image import transform_actions
@@ -40,6 +45,13 @@ class MeterBatch(ImagesBatch):
         super().__init__(*args, **kwargs)
         self._time_stamps = {}
 
+
+    def _check_bbox(self, bbox, image):
+        lt = np.array(bbox[:2])
+        rb = bbox[:2] + np.array(bbox[2:])
+        shape = self._get_image_shape(image)[::-1]
+        condition = (lt >= 0)* (lt <= shape) * (rb >= 0) * (rb <= shape) * (rb >= lt)
+        return np.all(condition)
 
 
     def _normalize_bb_(self, image, bbox, **kwargs):
@@ -120,23 +132,6 @@ class MeterBatch(ImagesBatch):
 
         return self
 
-    def _convert_bbox_(self, bbox, sep=', '):
-        """ Convert bounding box's coordinates to ``int``.
-
-        Parameters
-        ----------
-        src : str
-            Component to get bounding boxes from. Default is 'images'.
-        dst : str
-            Component to write bounding boxes to. Default is 'images'.
-
-        Returns
-        -------
-        self
-        """
-
-        return np.array([float(x) for x in bbox.split(sep)])
-
 
     def _resize_bb_only_(self, bbox, original_shape, shape, **kwargs):
         factor = np.asarray(shape) / np.asarray(original_shape)
@@ -164,7 +159,14 @@ class MeterBatch(ImagesBatch):
         factor = np.asarray(shape) / np.asarray(self._get_image_shape(image))
         return super()._resize_(image, shape, **kwargs), bbox * np.tile(factor[::-1], 2)
 
-
+    @action
+    @inbatch_parallel(init='indices')
+    def imsave(self, ix, components, *args, **kwargs):
+        image = self.get(ix, components)
+        bbox = self.get(ix, 'coordinates')
+        name = 'aug' + str(np.random.randint(10**16, 10**17))
+        self.pipeline.set_variable('bboxes', {name: bbox}, mode='u')
+        imwrite('../newone/data/augmented_images/'+name+'.png',image)
 
     def _affine_transform_(self, image, bbox, matrix, *args, **kwargs):
         """ Perfoms affine transformation.
@@ -200,7 +202,7 @@ class MeterBatch(ImagesBatch):
             right_bottom_bb[1-i] = max(left_top[i], left_bottom[i], right_bottom[i], right_top[i])
         new_bbox[2], new_bbox[3] = right_bottom_bb - new_bbox[:2]
 
-        if new_bbox[0] < 0 or new_bbox[1] < 0:
+        if not self._check_bbox(new_bbox, image):
             return image, bbox
         return super()._affine_transform_(image, matrix=matrix, *args, **kwargs), new_bbox
 
@@ -249,7 +251,7 @@ class MeterBatch(ImagesBatch):
         self
         """
         new_bbox = np.r_[np.array(bbox[:2]) + shift[1::-1], bbox[2:]]
-        if new_bbox[0] < 0 or new_bbox[1] < 0:
+        if not self._check_bbox(new_bbox, image):
             return image, bbox
         return super()._shift_(image, shift, **kwargs), new_bbox
 
@@ -289,12 +291,42 @@ class MeterBatch(ImagesBatch):
         self
         """
 
+        factor = (factor, factor) if isinstance(factor, Number) else factor
         shift = np.array(self._get_image_shape(image)) / 2
         scale_matrix = np.array([[factor[0],         0, 0, shift[0]-factor[0]*shift[0]],
                                  [        0, factor[1], 0, shift[1]-factor[1]*shift[1]],
                                  [        0,         0, 1,                           0],
                                  [        0,         0, 0,                           1]])
         return self._affine_transform_(image, bbox, scale_matrix, **kwargs)
+
+
+    def _flip_(self, image, bbox, mode):
+        """ Flips image.
+
+        Parameters
+        ----------
+        mode : {'lr', 'ud'}
+            - 'lr' - apply the left/right flip
+            - 'ud' - apply the upside/down flip
+        src : str
+            Component to get images from. Default is 'images'.
+        dst : str
+            Component to write images to. Default is 'images'.
+        p : float
+            Probability of applying the transform. Default is 1.
+
+        Returns
+        -------
+        self
+        """
+
+        shape = self._get_image_shape(image)
+        new_bbox = bbox.copy()
+        if mode == 'ud':
+            new_bbox[1] = shape[0] - bbox[1] - bbox[3]
+        elif mode == 'lr':
+            new_bbox[0] = shape[1] - bbox[0] - bbox[2]
+        return super()._flip_(image, mode), new_bbox
 
     @action
     @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
