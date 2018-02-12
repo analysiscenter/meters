@@ -166,7 +166,7 @@ class MeterBatch(ImagesBatch):
         bbox = self.get(ix, 'coordinates')
         name = 'aug' + str(np.random.randint(10**16, 10**17))
         self.pipeline.set_variable('bboxes', {name: bbox}, mode='u')
-        imwrite('../newone/data/augmented_images/'+name+'.png',image)
+        imwrite('../data/augmented_images/'+name+'.png',image)
 
     def _affine_transform_(self, image, bbox, matrix, *args, **kwargs):
         """ Perfoms affine transformation.
