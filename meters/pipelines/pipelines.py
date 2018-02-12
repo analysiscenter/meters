@@ -202,8 +202,7 @@ class PipelineFactory:
         """
         self._update_config(ppl_config, model_config)
 
-        train_ppl = self.load_all(src) + (Pipeline()
-                                          .load(src=images_src, fmt='image', components='full_images'))
+        train_ppl = self.load_all(src) + (Pipeline().load(src=images_src, fmt='image', components='full_images'))
         train_ppl += (
             Pipeline()
             .init_model(self.config['model_type'], TFModel, model_name,
@@ -221,7 +220,7 @@ class PipelineFactory:
 
         train_ppl += (
             Pipeline()
-            .init_variable('loss', init_on_each_run=list)
+            .init_variable('current_loss', init_on_each_run=list)
             .init_model(self.config['model_type'],
                         self.config['model'],
                         self.config['model_name'],
@@ -230,7 +229,7 @@ class PipelineFactory:
                          fetches='loss',
                          feed_dict={'images': B('images'),
                                     'labels': B('labels')},
-                         save_to=V('loss'),
+                         save_to=V('current_loss'),
                          mode=self.config['mode'])
         )
 
@@ -276,7 +275,7 @@ class PipelineFactory:
 
         return self.add_lazy_run(train_bb_ppl)
 
-    def simple_predict_bb(self, src, model_name, pipeline, ppl_config=None):
+    def simple_predict_bb(self, model_name, model, lazy=True, src=None, ppl_config=None):
         """Create simple train pipeline with predicted coordinates and lazy run at the end.
 
         Simple train includes:
@@ -292,8 +291,8 @@ class PipelineFactory:
             path to the folder with images and labels
         model_name : str
             name of the model in pipeline
-        pipeline
-            Dataset pipeline
+        model : Dataset pipeline, str
+            pipeline with trained model or src with saved model
         ppl_config : dict
             pipeline's config
 
@@ -302,17 +301,79 @@ class PipelineFactory:
         pipeline to the model prediction
         """
         self._update_config(ppl_config)
+        pred_bb_ppl = self.load_all(src) if src is not None else Pipeline()
 
-        pred_bb_ppl = self.load_all(src) + (Pipeline()
-                                            .import_model(model_name, pipeline)
-                                            .init_variable('prediction', init_on_each_run=list)
-                                            .predict_model(model_name,
-                                                           fetches='targets',
-                                                           feed_dict={'images': B('images'),
-                                                                      'labels': B('coordinates')},
-                                                           save_to=V('prediction'),
-                                                           mode=self.config['mode']))
-        return self.add_lazy_run(pred_bb_ppl)
+        if isinstance(model, str):
+            import_model = Pipeline().init_model(self.config['model_type'], TFModel, model_name,
+                                                 config={'load' : {'path' : model},
+                                                         'build': False})
+        else:
+            import_model = Pipeline().import_model(model_name, model)
+
+        pred_bb_ppl += import_model
+        pred_bb_ppl += (
+            Pipeline()
+            .init_variable('prediction', init_on_each_run=list)
+            .predict_model(model_name,
+                           fetches='targets',
+                           feed_dict={'images': B('images'),
+                                      'labels': B('coordinates')},
+                           save_to=V('prediction'),
+                           mode=self.config['mode'])
+        )
+
+        if lazy:
+            return self.add_lazy_run(pred_bb_ppl)
+        return pred_bb_ppl
+
+    def simple_predict_numbers(self, name_bb_model, bb_model, name_digits_model, digits_model, # pylint: disable=too-many-arguments
+                               src, images_src, shape=(64, 32), ppl_config_bb=None, ppl_config_digits=None):
+        """Create simple predict pipeline with predicted coordinates of bbox, croped display and
+        predict numbers on the display.
+
+        Simple train includes:
+
+        * load augmented images
+        * import model for coordinates prediction
+        * model prediction
+        * save the model predictions at each iteration
+        * import model for digits prediction
+        * model prediction
+        * save the predicted numbers at each iteration.
+
+        Parameters
+        ----------
+        name_bb_model : str
+            the name of the model for coordinates prediction
+        bb_model : Dataset pipeline, str
+            pipeline with trained model for coordinates prediction or src with saved model
+        name_digits_model : str
+            the name of the model for digits prediction
+        digits_model : Dataset pipeline, str
+            pipeline with trained model for digits prediction or src with saved model
+        src : str
+            path to the folder with images and labels for first model
+        images_src : str
+            path to the folder with full size images
+        shape : tuple or list
+            shape of the input images (original images will be resized if their shape is different)
+        ppl_config_bb : dict
+            a configuration dict for pipeline that predicts the coordinates
+        ppl_config_digits : dict
+            a configuration dict for pipeline that predicts the numbers.
+
+        Returns
+        -------
+        pipeline to the model prediction
+        """
+
+        ppl_config_digits['bbox_comp'] = V('prediction')
+        pred_num = self.simple_predict_bb(name_bb_model, bb_model, lazy=False, src=src, ppl_config=ppl_config_bb)
+        pred_num += Pipeline().load(src=images_src, fmt='image', components='full_images')
+        pred_num += self.simple_predict(name_digits_model, digits_model, lazy=False, make_src='full_images',
+                                        shape=shape, ppl_config=ppl_config_digits)
+
+        return self.add_lazy_run(pred_num)
 
     def simple_train(self, src, shape=(64, 32), ppl_config=None, model_config=None):
         """Create simple train pipeline with lazy run at the end.
@@ -342,7 +403,7 @@ class PipelineFactory:
         train_ppl = self.load_all(src) + self.make_digits(shape=shape)
         train_ppl += (
             Pipeline()
-            .init_variable('loss', init_on_each_run=list)
+            .init_variable('current_loss', init_on_each_run=list)
             .init_model(self.config['model_type'],
                         self.config['model'],
                         self.config['model_name'],
@@ -351,14 +412,15 @@ class PipelineFactory:
                          fetches='loss',
                          feed_dict={'images': B('images'),
                                     'labels': B('labels')},
-                         save_to=V('loss'),
+                         save_to=V('current_loss'),
                          mode=self.config['mode'])
         )
 
         return self.add_lazy_run(train_ppl)
 
 
-    def simple_predict(self, src, model_name, pipeline, shape=(64, 32), ppl_config=None):
+    def simple_predict(self, model_name, model, lazy=True, shape=(64, 32),
+                       make_src='images', src=None, ppl_config=None):
         """Create simple predict pipeline with lazy run at the end.
 
         Simple predict includes:
@@ -370,33 +432,43 @@ class PipelineFactory:
 
         Parameters
         ----------
-        src : str
-            path to the folder with images and labels
-        shape : tuple or list
-            shape of the input images (original images will be resized if their shape is different)
         model_name : str
             name of the model in pipeline
-        pipeline
-            Dataset pipeline
+        model : Dataset pipeline, str
+            pipeline with trained model or src with saved model
+        shape : tuple or list
+            shape of the input images (original images will be resized if their shape is different)
+        src : str
+            path to the folder with images and labels
         ppl_config : dict
-            configuration dict for pipeline
+            pipeline's config
 
         Returns
         -------
         pipeline to model prediction
         """
         self._update_config(ppl_config)
-        pred_ppl = self.load_all(src) + self.make_digits(shape=shape)
+        pred_ppl = self.load_all(src) if src is not None else Pipeline()
+        pred_ppl += self.make_digits(src=make_src, shape=shape)
+
+        if isinstance(model, str):
+            import_model = Pipeline().init_model(self.config['model_type'], TFModel, model_name,
+                                                 config={'load' : {'path' : model},
+                                                         'build': False})
+        else:
+            import_model = Pipeline().import_model(model_name, model)
+
+        pred_ppl += import_model
         pred_ppl += (
             Pipeline()
-            .init_variable('prediction', init_on_each_run=list)
-            .import_model(model_name, pipeline)
+            .init_variable('digits_prediction', init_on_each_run=list)
             .predict_model(model_name,
                            fetches='targets',
                            feed_dict={'images': B('images'),
                                       'labels': B('labels')},
-                           save_to=V('prediction'),
+                           save_to=V('digits_prediction'),
                            mode=self.config['mode'])
         )
-
-        return self.add_lazy_run(pred_ppl)
+        if lazy:
+            return self.add_lazy_run(pred_ppl)
+        return pred_ppl

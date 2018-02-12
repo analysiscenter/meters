@@ -56,7 +56,8 @@ class MeterBatch(ImagesBatch):
         self
         """
         image = self.get(ix, src)
-        x, y, width, height = self.get(ix, comp_coord)
+        x, y, width, height = self.get(ix, comp_coord) \
+                              if isinstance(comp_coord, str) else comp_coord[-1][0].astype(np.int32) # pylint: disable=no-member
         i = self.get_pos(None, src, ix)
         dst_data = image[y:y+height, x:x+width].copy()
         getattr(self, dst)[i] = dst_data
