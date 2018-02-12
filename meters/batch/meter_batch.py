@@ -56,8 +56,7 @@ class MeterBatch(ImagesBatch):
         self
         """
         image = self.get(ix, src)
-        coord_str = self.get(ix, comp_coord)
-        x, y, width, height = list(map(int, coord_str.split()))
+        x, y, width, height = self.get(ix, comp_coord)
         i = self.get_pos(None, src, ix)
         dst_data = image[y:y+height, x:x+width].copy()
         getattr(self, dst)[i] = dst_data
@@ -86,7 +85,7 @@ class MeterBatch(ImagesBatch):
         return batch
 
     @action
-    @inbatch_parallel(init='indices', post='assemble', src='labels', components='labels')
+    @inbatch_parallel(init='indices', post='_assemble', src='labels', components='labels')
     def split_labels(self, ix, src='labels'):
         """Splits labels from strig to list with separate numbers
 
