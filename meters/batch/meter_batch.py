@@ -6,7 +6,7 @@ from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_
 
 class MeterBatch(ImagesBatch):
     """Batch class for meters"""
-    components = 'full_images', 'images', 'labels', 'coordinates', 'indices', 'pred_coordinates'
+    components = 'croped_images', 'images', 'labels', 'coordinates', 'indices', 'pred_coordinates'
 
     def _init_component(self, **kwargs):
         """Create a new attribute with the name specified by ``kwargs['dst']``,
@@ -32,13 +32,12 @@ class MeterBatch(ImagesBatch):
         return image
 
     @action
-    @inbatch_parallel(init='indices', post='assemble', components='pred_coordinates')
+    @inbatch_parallel(init='indices', post='_assemble', components='pred_coordinates')
     def get_global_coordinates(self, ix, src='pred_coordinates', img='images'):
         """global coordinates"""
         coordinates = self.get(ix, src)
-        images = self.get(ix, img).shape[::-1] * 2
-        return [coord * img for coord, img in zip(coordinates, images)]
-
+        global_coord = np.maximum(0, coordinates * np.tile(self.get(ix, img).shape[1::-1], 2))
+        return list(map(np.int32, global_coord))
     @action
     @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
     def crop_from_bbox(self, ix, src='images', dst='display', comp_coord='coordinates'):
@@ -61,9 +60,8 @@ class MeterBatch(ImagesBatch):
         i = self.get_pos(None, src, ix)
         dst_data = image[y:y+height, x:x+width].copy()
         getattr(self, dst)[i] = dst_data
-
     @action
-    def split_to_digits(self, n_digits=8):
+    def split_to_digits(self, n_digits=8, is_pred=False):
         """Split image with ``n_digits`` numbers to ``n_digits`` images each with one number
 
         Parameters
@@ -75,8 +73,9 @@ class MeterBatch(ImagesBatch):
         ------
         self
         """
-        batch = ImagesBatch(DatasetIndex(np.arange(len(self.labels.reshape(-1)))))
-        batch.labels = self.labels.reshape(-1)
+        batch = ImagesBatch(DatasetIndex(np.arange(n_digits * self.images.shape[0])))
+        if not is_pred:
+            batch.labels = self.labels.reshape(-1)
         numbers = np.array([None] * len(self.index))
         for i, image in enumerate(self.display):
             # [None] is added because numpy can not automaticlly create an array with `object` type.
