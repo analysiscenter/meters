@@ -374,8 +374,7 @@ class PipelineFactory:
             return self.add_lazy_run(pred_bb_ppl)
         return pred_bb_ppl
 
-    def simple_predict_numbers(self, name_bb_model, bb_model, name_digits_model, digits_model, # pylint: disable=too-many-arguments
-                               src, shape=(64, 32), ppl_config_bb=None, ppl_config_digits=None):
+    def full_prediction(self, src, shape=(64, 32), ppl_config_bb=None, ppl_config_digits=None):
         """Create simple predict pipeline with predicted coordinates of bbox, croped display and
         predict numbers on the display.
 
@@ -414,13 +413,10 @@ class PipelineFactory:
         """
 
         ppl_config_digits['bbox_comp'] = V('prediction')
-        ppl_config_bb['model_name'] = name_bb_model
-        ppl_config_bb['model'] = bb_model
 
-        ppl_config_digits['model_name'] = name_digits_model
-        ppl_config_digits['model'] = digits_model
         pred_num = self.predict_coordinates(src=src, ppl_config=ppl_config_bb)
         pred_num += self.predict_digits(make_src='images', shape=shape, is_pred=True, ppl_config=ppl_config_digits)
+
         if self.config['lazy']:
             return self.add_lazy_run(pred_num)
         return pred_num
