@@ -6,7 +6,7 @@ from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_
 
 class MeterBatch(ImagesBatch):
     """Batch class for meters"""
-    components = 'croped_images', 'images', 'labels', 'coordinates', 'indices', 'pred_coordinates'
+    components = 'resized_images', 'images', 'labels', 'coordinates', 'indices', 'pred_coordinates'
 
     def _init_component(self, **kwargs):
         """Create a new attribute with the name specified by ``kwargs['dst']``,
@@ -34,13 +34,26 @@ class MeterBatch(ImagesBatch):
     @action
     @inbatch_parallel(init='indices', post='_assemble', components='pred_coordinates')
     def get_global_coordinates(self, ix, src='pred_coordinates', img='images'):
-        """global coordinates"""
+        """Recalculates from relative coordinates to global.
+
+        Parameters
+        ----------
+        src : str
+            the name of the component with relarive coordinates
+        img : str
+            the name of the component with images
+
+        Returns
+        -------
+        self
+        """
         coordinates = self.get(ix, src)
         global_coord = np.maximum(0, coordinates * np.tile(self.get(ix, img).shape[1::-1], 2))
         return list(map(np.int32, global_coord))
+
     @action
     @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
-    def crop_from_bbox(self, ix, src='images', dst='display', comp_coord='coordinates'):
+    def crop_from_bbox(self, ix, src='images', dst='display', component_coord='coordinates'):
         """Crop area from an image using ``coordinates`` attribute
 
         Parameters
@@ -49,19 +62,21 @@ class MeterBatch(ImagesBatch):
             data component's name
         dst : str
             the name of the component where the result will be recorded
+        component_coord : str
+            the name of the component with coordinates of the display with digits
 
         Returns
         -------
         self
         """
         image = self.get(ix, src)
-        x, y, width, height = self.get(ix, comp_coord) \
-                              if isinstance(comp_coord, str) else comp_coord[-1][0].astype(np.int32) # pylint: disable=no-member
+        x, y, width, height = self.get(ix, component_coord)
         i = self.get_pos(None, src, ix)
         dst_data = image[y:y+height, x:x+width].copy()
         getattr(self, dst)[i] = dst_data
+
     @action
-    def split_to_digits(self, n_digits=8, is_pred=False):
+    def split_to_digits(self, n_digits=8, is_training=False):
         """Split image with ``n_digits`` numbers to ``n_digits`` images each with one number
 
         Parameters
@@ -74,8 +89,10 @@ class MeterBatch(ImagesBatch):
         self
         """
         batch = ImagesBatch(DatasetIndex(np.arange(n_digits * self.images.shape[0])))
-        if not is_pred:
+        if is_training:
             batch.labels = self.labels.reshape(-1)
+            if isinstance(batch.labels[0], list):
+                batch.labels = np.concatenate(batch.labels)
         numbers = np.array([None] * len(self.index))
         for i, image in enumerate(self.display):
             # [None] is added because numpy can not automaticlly create an array with `object` type.
