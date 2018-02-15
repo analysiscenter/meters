@@ -1,8 +1,9 @@
 # pylint: disable=attribute-defined-outside-init
 """Batch class for water meter task"""
+import copy
 import numpy as np
 import tensorflow as tf
-
+from scipy.special import expit
 from scipy.misc import imresize
 from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed, DatasetIndex
 
@@ -72,16 +73,19 @@ class MeterBatch(ImagesBatch):
         -------
         self
         """
+        # print('crop_background generate_data')
+
         image = self.get(ix, src)
 
         coord_str = self.get(ix, 'coordinates')
         x, y, width, height = list(map(int, coord_str.split()))
-        image[y:y+height, x:x+width] = image[y - height:y, x:x+width]
+        background = copy.deepcopy(image)
+        background[y:y+height, x:x+width] = image[y - height:y, x:x+width]
 
         new_height, new_width = new_size[0], new_size[1]
         y_crop = np.random.randint(0, image.shape[0] - new_height)
         x_crop = np.random.randint(0, image.shape[1] - new_width)
-        dst_data = image[y_crop: y_crop + new_height, x_crop: x_crop + new_width, :]
+        dst_data = background[y_crop: y_crop + new_height, x_crop: x_crop + new_width, :]
         i = self.get_pos(None, src, ix)
         try:
             getattr(self, dst)[i] = dst_data
@@ -102,9 +106,13 @@ class MeterBatch(ImagesBatch):
         ------
         self
         """
+
         batch = MeterBatch(DatasetIndex(np.arange(len(self.labels.reshape(-1)))))
         batch.labels = self.labels.reshape(-1)
-        batch.background = np.tile(self.background, len(self.labels))
+        # print(self.background.shape, 'self.background shape')
+        batch.background = np.tile(self.background, n_digits)
+        # print(batch.background.shape, 'batch.background shape')
+
         batch.predicted_bb = []
         batch.cropped_images = []
         numbers = np.array([None] * len(self.index))
@@ -117,48 +125,97 @@ class MeterBatch(ImagesBatch):
 
 
     @action
-    @inbatch_parallel(init='_init_component', dst='background', post='assemble', components=('images', 'labels', 'coordinates', 'confidence'))
-    def generate_data(self, ix, dst='background', n_digits=8, normalize=True):
+    def split_cropped(self, n_digits=8, new_size=(32, 16, 3)):
+        batch = MeterBatch(DatasetIndex(np.arange(len(self.labels.reshape(-1)))))
+        batch.labels = self.labels.reshape(-1)
+        batch.images = self.cropped_images.reshape(-1, *new_size)
+        # batch.images = np.tile(self.images, n_digits)
+        print(batch.cropped_images.shape, 'batch cropped images shape')
+        return batch
+
+    @action
+    @inbatch_parallel(init='indices', post='assemble', components=('images', 'labels'))
+    def gen_classification_data(self, ix, background_proportion=0.1):
+        ''' Generate data for training classification task to classify 10 digits and
+        background class. Method takes current batch with digits after split_cropped and randomly
+        adds digit image for image with random meters' background.
+        Parameters
+        ---------
+        ix : index of current element in batch
+        Returns
+        -------
+        image, label
+        '''
+        label = self.get(ix, 'labels')
+        image = self.get(ix, 'images')
+        if np.random.binomial(1, background_proportion) == 1:
+            crop_height = image.shape[0]
+            crop_width = image.shape[1]
+            background = self.get(ix, 'background')
+            x = np.random.randint(0, background.shape[0] - crop_height)
+            y = np.random.randint(0, background.shape[1] - crop_width)
+            image = background[x: x + crop_height, y:y + crop_width, :]
+            label = np.hstack((np.zeros((10)), [1]))
+        else:
+            label = np.hstack((label, [0]))
+        return image, label
+
+    @action
+    @inbatch_parallel(init='indices', post='assemble', components=('images', 'labels', 'coordinates', 'confidence'))
+    def generate_data(self, ix, n_digits=8, normalize=True, prob=0.7):
         ''' Generate image with n_digits random MNIST digits om it
         Parameters
         ----------
         image : np.array
         '''
+        # print('enter generate_data')
+
         image = self.get(ix, 'images')
         height, width = image.shape[:2]
-        new_size = (height, np.round(width * n_digits * 1.5), 3)
         try:
-            canvas = self.get(ix, 'background')
+            canvas = copy.deepcopy(self.get(ix, 'background'))
         except Exception as e:
             print('failed on ', ix, e)
-            canvas = np.zeros(new_size) + np.mean(image)
+        new_size = canvas.shape[:2]
 
         random_indices = np.random.choice(self.images.shape[0], n_digits)
         random_images = [np.squeeze(self.images[i]) for i in random_indices]
         labels = np.array([self.labels[i] for i in random_indices]).reshape(-1)
         coordinates = []
+        confidence = np.zeros((n_digits, 1))
+
+        left_x = np.random.randint(0.0, new_size[0] - height)
         right_y = 0
-        confidence = [0] * n_digits
-        left_x = 0.0
         for index, random_image in enumerate(random_images):
             height = random_image.shape[0]
             width = random_image.shape[1]
+
             left_y = np.random.randint(right_y, right_y + np.round(0.5 * width))
             right_y = left_y + width
-            if np.random.binomial(1, 0.7) == 1:
-                canvas[:, left_y:right_y, :] = random_image
-                confidence[index] = 1
+            if np.random.binomial(1, prob) == 1:
+                canvas[left_x:left_x + height, left_y:right_y, :] = random_image
+                try:
+                    confidence[index, 0] = 1
+                except Exception as e:
+                    print('flag1', e)
+            else:
+                try:
+                    confidence[index, 0] = 0
+                except Exception as e:
+                    print('flag2', e)
             if normalize:
                 left_y /= new_size[1]
                 width /= new_size[1]
-                coordinates.append([left_x, left_y,  1.0, width])
+                new_left_x = left_x / new_size[0]
+                height /= new_size[0]
+                coordinates.append([new_left_x, left_y,  height, width])
             else:
                 width = float(width)
                 coordinates.append([left_x, left_y, height, width])
         return canvas, labels, coordinates, confidence
 
     @action
-    @inbatch_parallel(init='indices', post='assemble', components='cropped_images')
+    @inbatch_parallel(init='indices', post='assemble', components=('cropped_images', 'labels'))
     def crop_predictions(self, idx, n_digits=8, confidence_treshold=0.5, new_size=(32, 16)):
         """Split image with ``n_digits`` numbers to ``n_digits`` images each with one number
 
@@ -171,44 +228,79 @@ class MeterBatch(ImagesBatch):
         ------
         self
         """
-        # batch = MeterBatch(DatasetIndex(np.arange(len(self.labels.reshape(-1)))))
-        # batch.labels = self.labels.reshape(-1)
-        # batch.coordinates = self.coordinates
-        # binary_confidence = (self.confidence.reshape(-1) > confidence_treshold).astype(int)
-        coordinates = self.get(idx, 'predicted_bb')
         try:
-            print('predicted_bb ', coordinates)
+            predictions = self.get(idx, 'predicted_bb')
+            print
+            labels = self.get(idx, 'labels')
+            confidence = self.get(idx, 'confidence')
+            # print('predictions shape ', predictions.shape)
         except Exception as e:
-            print("HERE", e)
-        # print(coordinates.shape, 'coordinates')
+            print('212', e)
+        try:
+            real_coordinates = self.get(idx, 'coordinates')
+        except Exception as e:
+            print('217', e)
+            raise ValueError
+
+        predictions = predictions.reshape((-1, 4))
+        coordinates = predictions[:, :4]
+
+        left_corners = [coordinates[i][0] for i in range(n_digits)]
+        sorted_indices = np.argsort(left_corners)
+        coordinates = coordinates[sorted_indices]
         denormalized_coordinates = self.denormalize_bb(self.images.shape[1:3], coordinates)
-        # print(denormalized_coordinates.shape, 'denormalized_coordinates')
-        images = self.get(idx, 'images')
+        try:
+            images = self.get(idx, 'images')
+        except Exception as e:
+            print('get images', e)
         cropped_images = []
+
         for i in range(n_digits):
             current_coords = denormalized_coordinates[i]
-            print(current_coords.shape, i, 'coords shape')
-            print(images.shape, 'images')
-            cropped_images.append(imresize(images[current_coords[0]:current_coords[2], \
-                                         current_coords[1]:current_coords[3]], new_size))
+            print(current_coords)
+            try:
+                current = images[current_coords[0]:current_coords[2], \
+                                         current_coords[1]:current_coords[3]]
+            except Exception as e:
+                print('SLICING ERROR', current_coords, e)
 
+            try:
+                cropped_images.append(imresize(current, new_size))
+                if confidence[i] == 1:
+                    labels[i] = np.hstack((labels[i], [0]))
+                else:
+                    labels[i] = np.hstack((np.zeros((10)), [1]))
+            except Exception as e:
+                cropped_images.append(np.zeros((new_size[0], new_size[1], 3)))
+                print('RESIZE EROOR', 'CURRENT ', current, e)
+                pass
             
         # self.cropped_images = np.stack(cropped_images, axis=1)
-        cropped_images = np.stack(cropped_images, axis=1)
-        print(cropped_images.shape, 'CROPPED SHAPE')
-
-        return cropped_images
+        try:
+            cropped_images = np.stack(cropped_images, axis=0)
+        except Exception as e:
+            print(cropped_images, 'stack cropped_images ', e)
+        try:
+            labels = labels.reshape((-1, 11))
+        except Exception as e:
+            print('labels reshape fail', e)
+        # print(cropped_images.shape, 'CROPPED SHAPE')
+        return cropped_images, labels
 
     def denormalize_bb(self, img_size, coordinates, n_digits=8):
         height, width = img_size
+        coordinates = copy.deepcopy(coordinates)
         coordinates = coordinates.reshape(-1, 4)
-        boarders = np.ones((coordinates.shape[0]))
+        max_boarders = np.ones((coordinates.shape[0]))
+        min_boarders = np.zeros((coordinates.shape[0]))
         scales = [height, height, width, width]
-        for i in range(4):
-            coordinates[:, i] = np.minimum(coordinates[:, i], boarders)
+        for i in range(4):  
+            coordinates[:, i] = np.minimum(coordinates[:, i], max_boarders)
+            coordinates[:, i] = np.maximum(coordinates[:, i], min_boarders)
             coordinates[:, i] *= scales[i]
         coordinates[:, 2] += coordinates[:, 0]
         coordinates[:, 3] += coordinates[:, 1]
+        # print(coordinates)
         return coordinates.astype(np.int64)
 
     @action
