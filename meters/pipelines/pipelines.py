@@ -17,6 +17,17 @@ def default_config():
     ``lazy`` - (bool) if ``True`` - adds a lazy run at the end. Default ``True``.
 
     About another parameters read in the :func:`pipeline <dataset.classes.pipeline>` documentation.
+    The default values for the remaining parameters are listed below:
+
+    ``model_type`` : 'dynamic'
+
+    ``mode`` : 'a'
+
+    ``batch_size`` : 1
+
+    ``shuffle``, ``drop_last`` : True
+
+    ``model`` , ``model_name``, ``n_epochs`` : None
 
     Returns
     -------
@@ -34,14 +45,29 @@ def default_config():
         'batch_size': 1,
         'n_epochs': None,
         'shuffle': True,
-        'drop_last': True,
-        'feed_dict' : None
+        'drop_last': True
     }
 
 def default_model_config():
     """Create default model config.
 
     About parameters you can read in the :func:`model <dataset.models>` documentation.
+
+    The default values are listed below:
+
+    ``inputs`` :
+
+        ``images`` : shape = (64, 32, 3)
+
+        ``labels`` : classes = 10, transform = 'ohe', name = 'targets'
+
+    ``optimizer`` : Adam
+
+    ``loss`` : ce
+
+    ``input_block/inputs`` : 'images'
+
+    ``ouput`` : 'labels', 'proba', 'accuracy'
 
     Returns
     -------
@@ -58,7 +84,9 @@ def default_model_config():
         'output': dict(ops=['labels', 'proba', 'accuracy'])
     }
 def default_components():
-    """Create dict with default names of components
+    """Create dict with default names of the components
+
+    The initial values are the same as the names of the components.
 
     Returns
     -------
@@ -70,7 +98,7 @@ def default_components():
         'labels': 'labels'
     }
 class PipelineFactory:
-    """Consists of methods for pipelines creation
+    """ Сontains methods for quickly creating simple pipelines.
 
     Parameters
     ----------
@@ -85,7 +113,7 @@ class PipelineFactory:
         self._update_config(pipeline_config, model_config)
 
     def _update_config(self, pipeline_config=None, model_config=None):
-        """Get all parameters from ``config`` and update internal configs
+        """Get all parameters from ``pipeline_config`` and ``model_config`` and update internal configs
 
         Parameters
         ----------
@@ -98,7 +126,7 @@ class PipelineFactory:
         self.model_config.update(model_config if model_config is not None else '')
 
     def _update_components(self, components):
-        """Get names from components and update default components dict with new values.
+        """Replaces standard component names with names from ``components``.
 
         Parameters
         ----------
@@ -114,14 +142,20 @@ class PipelineFactory:
         return default_comp
 
     def _load_func(self, data, _, fmt, components=None, *args, **kwargs):
-        """Compares downloaded data with components.
+        """Writes the data for components to a dictionary of the form:
+
+        key : component's name
+
+        value : data for this component
 
         Parameters
         ----------
         data : DataFrame
             inputs data
+        fmt : str
+            data format
         components : list or str
-            the names of the components in which to download the data
+            the names of the components into which the data will be loaded.
 
         Returns
         -------
@@ -142,16 +176,16 @@ class PipelineFactory:
         """Load data from path with certain format.
         Standard path to images is ``src + '/images'``, for labels and coordinates is ``src + '/labels/data.csv'``
 
-        Format of the images must be `blosc`. Images will be saved as 'images' component.
+        Format of the images must be ``blosc``. Images will be saved as components['images'] component.
 
         Labels and coordinates are expected to be loaded from csv file. Labels and coordinates will be saved as
-        'labels' and 'coordinates' components.
+        components['labels'] and components['coordinates'] components.
 
         Parameters
         ----------
         src : str
             path to the folder with images and labels
-        components : dict
+        components : dict, optional
             new names of the components
 
         Returns
@@ -171,18 +205,18 @@ class PipelineFactory:
 
         return load_ppl
 
-    def make_digits(self, shape=None, is_training=True, components=None, pipeline_config=None):
+    def make_digits(self, shape=(64, 32), is_training=True, components=None, pipeline_config=None):
         """Сrop images by ``coordinates`` and extract digits from them
 
         Parameters
         ----------
         shape : tuple or list
-            shape of the input images (original images will be resized if their shape is different)
-        is_training : bool, optional, default True
-            if ``True`` labels will be loaded
-        components : dict
+            shape of the input images (original images will be resized if their shape is different), default (64, 32)
+        is_training : bool, optional
+            if ``True`` labels will be loaded, default True
+        components : dict, optional
             new names of the components
-        pipeline_config : dict
+        pipeline_config : dict, optional
             pipeline's config
 
         Returns
@@ -201,12 +235,12 @@ class PipelineFactory:
 
         return make_ppl
 
-    def add_lazy_run(self, ppl):
-        """Create lazy run pipeline
+    def add_lazy_run(self, pipeline):
+        """Add lazy run at the end of the pipeline
 
         Parameters
         ----------
-        ppl
+        pipeline
             dataset pipeline
 
         Returns
@@ -214,20 +248,22 @@ class PipelineFactory:
         lazy run pipeline
         """
         if not self.config['lazy']:
-            return ppl
-        return ppl.run(self.config['batch_size'],
-                       n_epochs=self.config['n_epochs'],
-                       shuffle=self.config['shuffle'],
-                       drop_last=self.config['drop_last'],
-                       lazy=True)
+            return pipeline
+        return pipeline.run(self.config['batch_size'],
+                            n_epochs=self.config['n_epochs'],
+                            shuffle=self.config['shuffle'],
+                            drop_last=self.config['drop_last'],
+                            lazy=True)
 
     def train_to_digits(self, src, shape=(64, 32), components=None, pipeline_config=None, model_config=None):
-        """A training pipeline is created to train model predict digits. If ```config['lazy']``` is True,
+        """A pipeline is created to train the model to classify the numbers. If ```config['lazy']``` is True,
         the pipeline with lazy run will be returned.
 
         Simple train includes:
 
-        * load + make
+        * load images, coordinates and labels
+        * make digits
+        * normalize images
         * init model
         * train model
         * save loss value at each iteration into a pipeline variable named ```current_loss```.
@@ -236,13 +272,13 @@ class PipelineFactory:
         ----------
         src : str
             path to the folder with images and labels
-        shape : tuple or list
-            shape of the input images (original images will be resized if their shape is different)
-        components : dict
+        shape : tuple or list, optional
+            shape of the input images (original images will be resized if their shape is different), default (64, 32)
+        components : dict, optional
             new names of the components
-        pipeline_config : dict
+        pipeline_config : dict, optional
             pipeline's config
-        model_config : dict
+        model_config : dict, optional
             model's config
 
         Returns
@@ -277,27 +313,29 @@ class PipelineFactory:
         return self.add_lazy_run(train_ppl)
 
     def predict_digits(self, shape=(64, 32), is_training=True, src=None, components=None, pipeline_config=None):
-        """"A prediction pipeline is created to predict digits. If ```config['lazy']``` is True,
+        """"A pipeline is created to predict the digits. If ```config['lazy']``` is True,
         the pipeline with lazy run will be returned.
 
         Simple predict includes:
 
-        * laod + make
+        * laod images, coordinates and labels
+        * make separate digits
+        * normalize images
         * import model
         * predict model
-        * save prediction to variable named ```prediction```.
+        * save prediction to variable named ```predictions```.
 
         Parameters
         ----------
-        shape : tuple or list
-            shape of the input images (original images will be resized if their shape is different)
-        is_training : bool, optional, default True
-            if ``True`` labels will be loaded
-        src : str
+        shape : tuple or list, optional
+            shape of the input images (original images will be resized if their shape is different), default (64, 32)
+        is_training : bool, optional
+            if ``True`` labels will be loaded, default True
+        src : str, optional
             path to the folder with images and labels
-        components : dict
+        components : dict, optional
             new names of the components
-        pipeline_config : dict
+        pipeline_config : dict, optional
             pipeline's config
 
         Returns
@@ -337,26 +375,30 @@ class PipelineFactory:
         return self.add_lazy_run(pred_ppl)
 
     def train_to_coordinates(self, src, components=None, pipeline_config=None, model_config=None):
-        """Create simple train pipeline to predict the coordinates. At the end of the pipeline is added a lazy run.
+        """Create train pipeline to predict the coordinates. If ```config['lazy']``` is True,
+        the pipeline with lazy run will be returned.
 
         Simple train includes:
 
-        * load augmented images
+        * load images
         * load coordinates
+        * resize images to (120, 120)
+        * normalize images
         * init model
         * train model
-        * save loss value at each iteration.
+        * save loss value at each iteration into a pipeline variable named ```current_loss```.
 
         Parameters
         ----------
-        src : simple_train
+        src : str
             path to the folder with images and labels
-        components : dict
+        components : dict, optional
             new names of the components
-        pipeline_config : dict
+        pipeline_config : dict, optional
             pipeline's config
-        model_config : dict
+        model_config : dict, optional
             model's config
+
         Returns
         -------
         pipeline to train the model
@@ -390,22 +432,25 @@ class PipelineFactory:
         return self.add_lazy_run(train_bb_ppl)
 
     def predict_coordinates(self, src=None, components=None, pipeline_config=None):
-        """Create simple train pipeline with predicted coordinates and lazy run at the end.
+        """Create pipeline to predict coordinates. If ```config['lazy']``` is True,
+        the pipeline with lazy run will be returned.
 
         Simple train includes:
 
-        * load augmented images
+        * load images
         * import model
+        * resize images
+        * normalize images
         * predict model
         * save the model predictions at each iteration.
 
         Parameters
         ----------
-        src : str
+        src : str, optional
             path to the folder with images and labels
-        components : dict
+        components : dict, optional
             new names of the components
-        pipeline_config : dict
+        pipeline_config : dict, optional
             pipeline's config
 
         Returns
@@ -437,12 +482,14 @@ class PipelineFactory:
             .multiply(multiplier=1/255., preserve_type=False,
                       src=components['resized_images'],
                       dst=components['resized_images'])
+            .init_variable('predictions', init_on_each_run=list)
             .predict_model(model_name,
                            fetches='predictions',
                            feed_dict={'images': B(components['resized_images'])},
                            save_to=B(components['coordinates']),
                            mode='w')
             .get_global_coordinates(src=components['coordinates'], img=components['images'])
+            .update_variable('predictions', B('pred_coordinates'), mode=self.config['mode'])
         )
 
         return self.add_lazy_run(pred_bb_ppl)
@@ -450,31 +497,32 @@ class PipelineFactory:
     def full_prediction(self, src, shape=(64, 32), components_coord=None, pipeline_config_coord=None,
                         components_digits=None, pipeline_config_digits=None):
         """Create simple predict pipeline with predicted coordinates of bbox, croped display and
-        predict numbers on the display.
+        predict numbers on the display. If ```config['lazy']``` is True, the pipeline with lazy
+        run will be returned.
 
         Simple train includes:
 
-        * load augmented images
+        * load images
         * import model for coordinates prediction
         * model prediction
-        * save the model predictions at each iteration
+        * save the model predictions at each iteration into batch component named components['coordinates']
         * import model for digits prediction
         * model prediction
-        * save the predicted numbers at each iteration.
+        * save the predicted numbers at each iteration into pipeline variable named ``predictions``.
 
         Parameters
         ----------
         src : str
             path to the folder with images and labels for first model
-        shape : tuple or list
-            shape of the input images (original images will be resized if their shape is different)
-        components_coord : dict
+        shape : tuple or list, optional
+            shape of the input images (original images will be resized if their shape is different), default (64, 32)
+        components_coord : dict, optional
             new names of the components for pipeline with coordinates prediction
-        pipeline_config_coord : dict
+        pipeline_config_coord : dict, optional
             a configuration dict for pipeline that predicts the coordinates
-        components_digits : dict
+        components_digits : dict, optional
             new names of the components for pipeline with digits prediction
-        pipeline_config_digits : dict
+        pipeline_config_digits : dict, optional
             a configuration dict for pipeline that predicts the numbers.
 
         Returns
