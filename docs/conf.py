@@ -132,6 +132,7 @@ intersphinx_mapping = {
     'numpy': ('http://docs.scipy.org/doc/numpy/', None),
     'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
     'pandas': ('http://pandas-docs.github.io/pandas-docs-travis/', None),
+    'dataset': ('https://analysiscenter.github.io/dataset/', None),
 }
 
 viewcode_import = True
