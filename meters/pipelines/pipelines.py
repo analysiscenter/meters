@@ -352,7 +352,7 @@ class PipelineFactory:
         pred_ppl += self.make_digits(shape=shape, is_training=is_training, components=components)
 
         if isinstance(model, str):
-            import_model = Pipeline().init_model(self.config['model_type'], TFModel, model_name,
+            import_model = Pipeline().init_model('static', TFModel, model_name,
                                                  config={'load' : {'path' : model},
                                                          'build': False})
         else:
@@ -465,9 +465,8 @@ class PipelineFactory:
 
         pred_bb_ppl = Pipeline().load(src=src, fmt='image', components=components['images']) if src is not None \
                                                                                                   else Pipeline()
-
         if isinstance(model, str):
-            import_model = Pipeline().init_model(self.config['model_type'], TFModel, model_name,
+            import_model = Pipeline().init_model('static', TFModel, model_name,
                                                  config={'load' : {'path' : model},
                                                          'build': False})
         else:
