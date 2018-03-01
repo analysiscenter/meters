@@ -147,36 +147,37 @@ class MeterBatch(ImagesBatch):
 
     @action
     @inbatch_parallel(init='indices', post='_assemble', components=('new_images', 'labels', 'coordinates', 'confidence'))
-    def generate_data(self, ix, n_digits=8, normalize=True, scale_factor=1.2):
+    def generate_data(self, ix, n_digits=8, normalize=True, scale=1.2):
         ''' Generate image with n_digits random MNIST digits om it
         Parameters
         ----------
         image : np.array
         '''
+        # print('enter generate_data')
 
         image = self.get(ix, 'images')
-        canvas = copy.deepcopy(self.get(ix, 'background'))
-        # canvas = canvas / 255. because imresize will return data in [0, 255]
-        canvas_size = canvas.shape[:2]
+        height, width = image.shape[:2]
+        try:
+            # canvas = self.get(ix, 'background')
+            canvas = copy.deepcopy(self.get(ix, 'background'))
+            canvas = canvas / 255.
+        except Exception as e:
+            print('failed on ', ix, e)
+        new_size = canvas.shape[:2]
+
         random_indices = np.random.choice(self.images.shape[0], n_digits)
+        random_images = [np.squeeze(self.images[i]) for i in random_indices]
         labels = np.array([self.labels[i] for i in random_indices]).reshape(-1)
-
-        scale_factor = np.random.uniform(0.7, 1.5)
-        height, width = (int(image.shape[0] * scale_factor), int(image.shape[1] * scale_factor))
-        random_images = [imresize(self.images[i], (height, width)) for i in random_indices]
-
-        interval = np.random.randint(0, max(1e-5, (canvas_size[1] - width * 8) / 8))
         coordinates = []
         confidence = np.zeros((n_digits, 1))
-        left_x = np.random.randint(0.0, canvas_size[0] - height)
-        try:
-            left_y = np.random.randint(low=0, high=max(1e-5, canvas_size[1] - (width + interval) * 8))
-        except Exception as e:
-            print(e, 'new_size ', canvas_size, ' (width + interval) * 8) ',  (width + interval) * 8)
+        left_x = np.random.randint(0.0, new_size[0] - height)
+        # print('generated left_x ', left_x)
+
         right_y = 0
-        gap_number = int(np.random.normal(loc=0, scale=1.2))
+        gap_number = int(np.random.normal(loc=0, scale=scale))
+        interval = np.random.randint(0, np.round(0.35 * width))
         for index, random_image in enumerate(random_images):
-            height = random_image.shape[0]
+            height = random_image.shape[0]  
             width = random_image.shape[1]
 
             left_y = right_y + interval
@@ -192,23 +193,21 @@ class MeterBatch(ImagesBatch):
                 try:
                     canvas[left_x:left_x + height, left_y:right_y, :] = random_image
                 except Exception as e:
-                    print('canvas crop in generate data', e, random_image.shape, canvas.shape, left_x, left_y, right_y)
-
+                    print('canvas crop in generate data', e)
                 try:
                     confidence[index, 0] = 1
                 except Exception as e:
                     print('flag1', e)
             
             if normalize:
-                norm_left_y = left_y / canvas_size[1]
-                norm_left_x = left_x / canvas_size[0]
-                norm_width = width / canvas_size[1]
-                norm_height = height / canvas_size[0]
-                coordinates.append([norm_left_x, norm_left_y,  norm_height, norm_width])
+                left_y /= new_size[1]
+                width /= new_size[1]
+                new_left_x = left_x / new_size[0]
+                height /= new_size[0]
+                coordinates.append([new_left_x, left_y,  height, width])
             else:
                 new_width = float(width)
                 coordinates.append([left_x, left_y, height, new_width])
-        print('inside generate_data: canvas.shape is', canvas.shape)
         return canvas, labels, coordinates, confidence
 
 
