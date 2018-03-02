@@ -29,7 +29,7 @@ class MeterBatch(ImagesBatch):
         """ Normalize pixel values to (0, 1). """
         image = self.get(ix, src)
         image /= 255.
-        return image
+        return (image,)
 
     @action
     @inbatch_parallel(init='indices', post='_assemble', components='pred_coordinates')
@@ -49,7 +49,7 @@ class MeterBatch(ImagesBatch):
         """
         coordinates = self.get(ix, src)
         global_coord = np.maximum(0, coordinates * np.tile(self.get(ix, img).shape[1::-1], 2))
-        return list(map(np.int32, global_coord))
+        return (list(map(np.int32, global_coord)),)
 
     @action
     @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
@@ -70,6 +70,8 @@ class MeterBatch(ImagesBatch):
         self
         """
         image = self.get(ix, src)
+        print('component_coord', component_coord)
+        print(self.get(ix, component_coord))
         x, y, width, height = self.get(ix, component_coord)
         i = self.get_pos(None, src, ix)
         dst_data = image[y:y+height, x:x+width].copy()
@@ -118,7 +120,7 @@ class MeterBatch(ImagesBatch):
         i = self.get_pos(None, src, ix)
         label = getattr(self, src)[i]
         more_label = list(map(int, label.replace(',', '')))
-        return more_label
+        return (more_label,)
 
     def _reraise_exceptions(self, results):
         """Reraise all exceptions in the ``results`` list
