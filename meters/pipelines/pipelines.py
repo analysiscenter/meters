@@ -83,6 +83,7 @@ def default_model_config():
         'input_block/inputs': 'images',
         'output': dict(ops=['labels', 'proba', 'accuracy'])
     }
+
 def default_components():
     """Create dict with default names of the components
 
@@ -97,20 +98,46 @@ def default_components():
         'coordinates': 'coordinates',
         'labels': 'labels'
     }
+
 class PipelineFactory:
     """ Сontains methods for quickly creating simple pipelines.
 
     Parameters
     ----------
     pipeline_config : dict
-            pipeline's config
+        pipeline's config
     model_config : dict
-            model's config
+        model's config
+    model_pipeline : pipeline
+        contains all loaded models from anothers pipelines
+    available_models : list
+        list with names of loaded models
     """
     def __init__(self, pipeline_config=None, model_config=None):
-        self.config = default_config()
+        self.pipeline_config = default_config()
         self.model_config = default_model_config()
         self._update_config(pipeline_config, model_config)
+        self.model_pipeline = Pipeline()
+        self.available_models = []
+
+    def add_model(self, model_name, model):
+        """ Save the model to the pipeline in order to avoid
+        re-loading the model when re-creating the pipeline.
+
+        Parameters
+        ----------
+        model_name : str
+            the name of the model
+        model : str
+            the path to the directory in which the model was saved
+        """
+        if model_name in self.available_models:
+            return
+        self.available_models.append(model_name)
+        import_model = Pipeline().init_model('static', TFModel, model_name,
+                                             config={'load' : {'path' : model},
+                                                     'build': False})
+        self.model_pipeline += import_model
 
     def _update_config(self, pipeline_config=None, model_config=None):
         """Get all parameters from ``pipeline_config`` and ``model_config`` and update internal configs
@@ -122,7 +149,7 @@ class PipelineFactory:
         model_config : dict
             model's config
         """
-        self.config.update(pipeline_config if pipeline_config is not None else '')
+        self.pipeline_config.update(pipeline_config if pipeline_config is not None else '')
         self.model_config.update(model_config if model_config is not None else '')
 
     def _update_components(self, components):
@@ -229,7 +256,7 @@ class PipelineFactory:
         make_ppl = Pipeline().crop_from_bbox(src=components['images'], component_coord=components['coordinates'])
         if is_training:
             make_ppl += Pipeline().split_labels()
-        make_ppl += Pipeline().split_to_digits(n_digits=self.config['n_digits'], is_training=is_training)
+        make_ppl += Pipeline().split_to_digits(n_digits=self.pipeline_config['n_digits'], is_training=is_training)
         make_ppl = make_ppl + Pipeline().resize(output_shape=shape, preserve_range=True,
                                                 src=components['images']) if shape is not None else make_ppl
 
@@ -247,12 +274,12 @@ class PipelineFactory:
         -------
         lazy run pipeline
         """
-        if not self.config['lazy']:
+        if not self.pipeline_config['lazy']:
             return pipeline
-        return pipeline.run(self.config['batch_size'],
-                            n_epochs=self.config['n_epochs'],
-                            shuffle=self.config['shuffle'],
-                            drop_last=self.config['drop_last'],
+        return pipeline.run(self.pipeline_config['batch_size'],
+                            n_epochs=self.pipeline_config['n_epochs'],
+                            shuffle=self.pipeline_config['shuffle'],
+                            drop_last=self.pipeline_config['drop_last'],
                             lazy=True)
 
     def train_to_digits(self, src, shape=(64, 32), components=None, pipeline_config=None, model_config=None):
@@ -295,20 +322,21 @@ class PipelineFactory:
             .multiply(multiplier=1/255., preserve_type=False,
                       src=components['images'],
                       dst=components['images'])
-            .init_model(self.config['model_type'],
-                        self.config['model'],
-                        self.config['model_name'],
+            .init_model(self.pipeline_config['model_type'],
+                        self.pipeline_config['model'],
+                        self.pipeline_config['model_name'],
                         config=self.model_config)
-            .train_model(self.config['model_name'],
+            .train_model(self.pipeline_config['model_name'],
                          fetches='loss',
                          feed_dict={'images': B(components['images']),
                                     'labels': B(components['labels'])},
                          save_to=V('current_loss'),
-                         mode=self.config['mode'])
+                         mode=self.pipeline_config['mode'])
         )
-        if self.config['save']:
-            path = self.config['model_name'] if self.config['model_path'] is None else self.config['model_path']
-            train_ppl.save_model(self.config['model_name'], path=path)
+        if self.pipeline_config['save']:
+            path = self.pipeline_config['model_name'] if self.pipeline_config['model_path'] \
+                                                      is None else self.pipeline_config['model_path']
+            train_ppl.save_model(self.pipeline_config['model_name'], path=path)
 
         return self.add_lazy_run(train_ppl)
 
@@ -345,20 +373,17 @@ class PipelineFactory:
         self._update_config(pipeline_config)
         components = self._update_components(components)
 
-        model_name = self.config['model_name']
-        model = self.config['model']
+        model_name = self.pipeline_config['model_name']
+        model = self.pipeline_config['model']
 
         pred_ppl = self.load_all(src) if src is not None else Pipeline()
         pred_ppl += self.make_digits(shape=shape, is_training=is_training, components=components)
-
         if isinstance(model, str):
-            import_model = Pipeline().init_model('static', TFModel, model_name,
-                                                 config={'load' : {'path' : model},
-                                                         'build': False})
+            if model_name not in self.available_models:
+                self.add_model(model_name, model)
+            pred_ppl += Pipeline().import_model(model_name, self.model_pipeline)
         else:
-            import_model = Pipeline().import_model(model_name, model)
-
-        pred_ppl += import_model
+            pred_ppl += Pipeline().import_model(model_name, model)
         pred_ppl += (
             Pipeline()
             .multiply(multiplier=1/255., preserve_type=False,
@@ -369,7 +394,7 @@ class PipelineFactory:
                            fetches='predictions',
                            feed_dict={'images': B(components['images'])},
                            save_to=V('predictions'),
-                           mode=self.config['mode'])
+                           mode=self.pipeline_config['mode'])
         )
 
         return self.add_lazy_run(pred_ppl)
@@ -414,20 +439,21 @@ class PipelineFactory:
                                                        src=components['resized_images'],
                                                        dst=components['resized_images'])
                                              .init_variable('current_loss', init_on_each_run=list)
-                                             .init_model(self.config['model_type'],
-                                                         self.config['model'],
-                                                         self.config['model_name'],
+                                             .init_model(self.pipeline_config['model_type'],
+                                                         self.pipeline_config['model'],
+                                                         self.pipeline_config['model_name'],
                                                          config=self.model_config)
-                                             .train_model(self.config['model_name'],
+                                             .train_model(self.pipeline_config['model_name'],
                                                           fetches='loss',
                                                           feed_dict={'images': B(components['resized_images']),
                                                                      'labels': B(components['coordinates'])},
                                                           save_to=V('current_loss'),
-                                                          mode=self.config['mode']))
+                                                          mode=self.pipeline_config['mode']))
 
-        if self.config['save']:
-            path = self.config['model_name'] if self.config['model_path'] is None else self.config['model_path']
-            train_bb_ppl.save_model(self.config['model_name'], path=path)
+        if self.pipeline_config['save']:
+            path = self.pipeline_config['model_name'] if self.pipeline_config['model_path'] \
+                                                      is None else self.pipeline_config['model_path']
+            train_bb_ppl.save_model(self.pipeline_config['model_name'], path=path)
 
         return self.add_lazy_run(train_bb_ppl)
 
@@ -460,19 +486,18 @@ class PipelineFactory:
         self._update_config(pipeline_config)
         components = self._update_components(components)
 
-        model_name = self.config['model_name']
-        model = self.config['model']
+        model_name = self.pipeline_config['model_name']
+        model = self.pipeline_config['model']
 
         pred_bb_ppl = Pipeline().load(src=src, fmt='image', components=components['images']) if src is not None \
                                                                                                   else Pipeline()
         if isinstance(model, str):
-            import_model = Pipeline().init_model('static', TFModel, model_name,
-                                                 config={'load' : {'path' : model},
-                                                         'build': False})
+            if model_name not in self.available_models:
+                self.add_model(model_name, model)
+            pred_bb_ppl += Pipeline().import_model(model_name, self.model_pipeline)
         else:
-            import_model = Pipeline().import_model(model_name, model)
+            pred_bb_ppl += Pipeline().import_model(model_name, model)
 
-        pred_bb_ppl += import_model
         pred_bb_ppl += (
             Pipeline()
             .resize(output_shape=(120, 120), preserve_range=True,
@@ -488,7 +513,7 @@ class PipelineFactory:
                            save_to=B(components['coordinates']),
                            mode='w')
             .get_global_coordinates(src=components['coordinates'], img=components['images'])
-            .update_variable('predictions', B('pred_coordinates'), mode=self.config['mode'])
+            .update_variable('predictions', B(components['coordinates']), mode=self.pipeline_config['mode'])
         )
 
         return self.add_lazy_run(pred_bb_ppl)
