@@ -70,8 +70,6 @@ class MeterBatch(ImagesBatch):
         self
         """
         image = self.get(ix, src)
-        print('component_coord', component_coord)
-        print(self.get(ix, component_coord))
         x, y, width, height = self.get(ix, component_coord)
         i = self.get_pos(None, src, ix)
         dst_data = image[y:y+height, x:x+width].copy()
