@@ -102,20 +102,40 @@ def format_coordinates(src_coord, labels):
 
 def format_data(src_data):
     """Convert data from csv to the format used in the experiment."""
+    try:
+        data = pd.read_csv(src_data)
+    except UnicodeDecodeError:
+        data = pd.read_excel(src_data)  # pylint: disable=redefined-variable-type
 
-    data = pd.read_csv(src_data)
     cols = data.columns
+    names = ['x', 'y', 'width', 'height']
+    values = []
+    bad_vals = []
+    coordinates = dict(zip(names, [0]*4))
 
-    numbers_coord = []
-    for string in data[cols[1]].values:
-        numbers_coord.append(list([int(i) for i in re.sub('\\D+', ' ', string[45:-7]).split(' ')[1:]]))
+    for j, string in enumerate(data[cols[1]].values):
+        ix_coord = sorted({coord : string.find(coord) for coord in coordinates.keys()}.items(), key=lambda x: x[1])
 
+        for i, idx in enumerate(ix_coord):
+            if i+1 < len(ix_coord):
+                coordinates[idx[0]] = (re.sub('[^0-9.]', '', string[idx[1]: ix_coord[i+1][1]]))
+            else:
+                coordinates[idx[0]] = (re.sub('[^0-9.]', '', string[idx[1]: ]))
+
+        if '' in coordinates.values():
+            bad_vals.append(j)
+            continue
+
+        values.append(list(map(lambda name: int(np.float32(coordinates[name])), names)))
+
+    data = data.drop(bad_vals)
+    labels = list(map(lambda a: str(a).replace('.', '.'), data[cols[-1]].values))
     data.columns = ['file_name'] + list(data.columns[1:])
     data['file_name'] = ['a' + '0' * (5 - len(str(d))) + str(d) for d in data[data.columns[0]].values]
     new_data = pd.DataFrame(index=data['file_name'],
                             columns=['x', 'y', 'h', 'w', 'labels'],
                             data=[[*coord, label] for coord, label in
-                                  list(zip(np.array(numbers_coord), data[cols[-1]].values))])
+                                  list(zip(np.array(values), labels))])
     return new_data
 
 if __name__ == "__main__":
