@@ -193,7 +193,7 @@ class PipelineFactory:
 
         for comp in components:
             if 'labels' not in comp:
-                _comp_dict[comp] = data[data.columns[:-1]].values
+                _comp_dict[comp] = data[data.columns[:-1]].values.astype(int)
             else:
                 _comp_dict[comp] = data[data.columns[-1]].values
 
