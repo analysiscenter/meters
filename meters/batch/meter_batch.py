@@ -104,7 +104,7 @@ class MeterBatch(ImagesBatch):
         ------
         self
         """
-        batch = MeterBatch(DatasetIndex(np.arange(n_digits * self.images.shape[0])))
+        batch = MeterBatch(DatasetIndex(np.arange(n_digits * self.images.shape[0]))) # pylint: disable=access-member-before-definition
         if is_training:
             batch.labels = self.labels.reshape(-1)
             if isinstance(batch.labels[0], list):
