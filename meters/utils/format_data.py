@@ -104,7 +104,7 @@ def format_data(src_data):
     """Convert data from csv to the format used in the experiment."""
     try:
         data = pd.read_csv(src_data)
-    except UnicodeDecodeError:
+    except: # pylint: disable=bare-except
         data = pd.read_excel(src_data)  # pylint: disable=redefined-variable-type
 
     cols = data.columns

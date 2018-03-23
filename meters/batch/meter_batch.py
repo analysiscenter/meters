@@ -163,13 +163,15 @@ class MeterBatch(ImagesBatch):
         rand_height = np.random.randint(height-coefh, height+coefh, 2)
         rand_width = np.random.randint(width-coefw, width+coefw, 2)
         rand_zero = np.random.randint(-coefz, coefz, 4)
+        if image[0][0][0] < 1:
+            image = image*255
         img = Image.fromarray(np.uint8(image))
 
         coeffs = self._find_coeffs([(0, 0), (height, 0), (height, width), (0, width)],
                                    [(rand_zero[0], rand_zero[1]), (rand_height[0], rand_zero[2]),
                                     (rand_height[1], rand_width[0]), (rand_zero[3], rand_width[1])])
         img = img.transform((width, height), Image.PERSPECTIVE, coeffs, Image.BICUBIC)
-        return (img,)
+        return (np.array(img),)
 
     def _reraise_exceptions(self, results):
         """Reraise all exceptions in the ``results`` list
