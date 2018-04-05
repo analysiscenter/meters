@@ -3,18 +3,19 @@
 import copy
 import cv2
 import numpy as np
-import tensorflow as tf
+import tensorflow as tensorflow
 from scipy.special import expit
 from scipy.misc import imresize
 import matplotlib.pyplot as plt
+from PIL import Image
 # import sys
 # sys.path.append('..//..//meters/')
-from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed, DatasetIndex
+from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed, DatasetIndex, F
 
 class MeterBatch(ImagesBatch):
     """Batch class for meters"""
     components = 'images', 'labels', 'coordinates', 'indices', 'background', 'predicted_bb', 'confidence', 'cropped_images', \
-                 'new_images', 'cropped_labels', 'resized_images', 'pred_coordinates'
+                 'new_images', 'cropped_labels', 'resized_images', 'pred_coordinates', 'digit_coordinates'
 
     @property
     def target(self):
@@ -57,6 +58,158 @@ class MeterBatch(ImagesBatch):
         global_coord = np.maximum(0, coordinates * np.tile(self.get(ix, img).shape[1::-1], 2))
         return (list(map(np.int32, global_coord)),)
 
+    @action
+    @inbatch_parallel(init='indices', post='_assemble', components='confidence')
+    def assign_confidence(self, ix, max_digits=8):
+        len_labels = np.array(self.get(ix, 'labels')).shape[0]
+        if len_labels == 1:
+            print('wrong labels shape', 'len labels', len_labels)
+            raise AssertionError
+        confidence = np.hstack((np.ones(len_labels), np.zeros(8 - len_labels)))
+        # print('conf', confidence)
+        return (confidence, )
+
+    # def get_crop(self, ix, coords, normalized=True, img_src='images'):
+    #     x, y, height, width = coords
+    #     if normalized:
+    #         image_height, image_width = self.get(ix, img_src).shape[:2]
+    #         coords[]
+
+    @action
+    @inbatch_parallel(init='indices', post='_assemble', components=('images', 'labels'))
+    def skip_digits(self, ix, img_src='images', coords_src='digit_coordinates'):
+        img = self.get(ix, 'images')
+        labels = np.array(self.get(ix, 'labels'))
+        if len(labels) == 8:
+            new_labels = copy.deepcopy(labels)
+            gap_number = - abs(int(np.random.normal(loc=0, scale=1.2)))
+            # print(gap_number, 'gap_number')
+            coords = self.get(ix, 'digit_coordinates')
+            # print('before')
+            # plt.imshow(img)
+            # plt.show()
+            # print('--------------')
+            for index in range(len(labels)):
+                if gap_number > 0 and index <= gap_number or gap_number < 0 and index >= len(labels) + gap_number:
+                    new_labels[index] = -1
+                    x, y, height, width = coords[index, :].astype(int)
+                    try:
+                      img[x: x + height, y: y + width] = img[x - height: x, y: y + width][::-1, ::-1, :]
+                    except Exception as e:
+                        img[x: x + height, y: y + width] = img[x: height + x, y: y + width][::-1, ::-1, :]
+
+                    # plt.imshow(img[x: x + height, y: y + width])
+                    # plt.show()
+            # print('after')
+            # plt.imshow(img)
+            # plt.show()
+            # print('new_labels', new_labels)
+            labels = new_labels[new_labels >= 0]
+            # print('labels', labels)
+
+        return (img, labels)
+
+    @action
+    @inbatch_parallel(init='indices', post='_assemble', components='digit_coordinates')
+    def generate_digit_cordinates(self, ix, max_digits=8):
+        """ Generates bboxes for digit detection by splitting the display
+        into num_digits equal parts.
+        Parameters
+        ----------
+
+        max_digits : into
+            maximum number of stored digits per display.
+            all bboxes will be stored in arrays of size (max_digits, 4)
+        Returns
+        -------
+        digit_coordinates : np.ndarray
+            ndarray of size (max_digits, 4) with non-zero rows corresponding to existing digits bboxes.
+            Bounding boxes are global coordinates in format x, y, height, width
+        """
+        y, x, width, height = self.get(ix, 'coordinates')
+        num_digits = len(self.get(ix, 'labels'))
+        digit_coordinates = np.zeros((max_digits, 4))
+        for i in range(num_digits):
+            width_i = width // num_digits
+            y_i = y + i * width_i
+            digit_coordinates[i, :] = x, y_i, height, width_i
+        return (digit_coordinates.astype(np.int16), )
+
+
+    @action
+    @inbatch_parallel(init='indices', post='_assemble', components='coordinates')
+    def enlarge_coordinates(self, ix, src='coordinates'):
+        y, x, width, height = self.get(ix, src)
+        image_height, image_width = self.get(ix, 'images').shape[:2]
+        digit_height, digit_width = self.get(ix, 'digit_coordinates')[0, 2:]
+        try:
+            shift_left, shift_right = np.random.randint(digit_width * 2, digit_width * 4, size=2)
+        except Exception as e:
+            print('except', e)
+            print('ix=', ix)
+            print('digit_width', digit_width)
+        shift_up, shift_down = np.random.randint(digit_height, digit_height * 1.5, size=2)
+        y, x = max(y - shift_left, 0), max(x - shift_up, 0)
+        width, height = min(width + shift_right + shift_left, image_width), min(height + shift_up + shift_down, image_height)
+        return ([y, x, width, height], )
+
+    @action
+    @inbatch_parallel(init='indices', post='_assemble', components='digit_coordinates')
+    def update_digit_coordinates(self, ix):
+        digit_coordinates = self.get(ix, 'digit_coordinates')
+        y, x, width, height = self.get(ix, 'coordinates')
+        digit_coordinates[:, 0] = np.maximum(digit_coordinates[:, 0] - x, np.zeros(digit_coordinates[:, 0].shape))
+        digit_coordinates[:, 1] = np.maximum(digit_coordinates[:, 1] - y, np.zeros(digit_coordinates[:, 0].shape))
+        return (digit_coordinates, )
+
+    @action
+    @inbatch_parallel(init='indices', post='_assemble', components='digit_coordinates')
+    def normalize_coordinates(self, ix, src='digit_coordinates', image_src='images'):
+        digit_coordinates = self.get(ix, src)
+        height, width = self.get(ix, image_src).shape[:2]
+        norm_coords = self.normalize_bboxes(digit_coordinates, width, height, all_corners=False)[:, np.argsort([1, 0, 3, 2])]
+        return (norm_coords, )
+        # i = self.get_pos(None, src, ix)
+        # getattr(self, dst)[i] = norm_coords
+
+    @action
+    @inbatch_parallel(init='indices', post='_assemble', components=('images', 'labels'))
+    def shuffle_digits(self, ix):
+        image = self.get(ix, 'images')
+        coords = self.get(ix, 'digit_coordinates')
+        labels = self.get(ix, 'labels')
+        n_digits = len(labels)
+        # new_digit_indices = np.random.choice(n_digits, size=n_digits)
+        new_digit_indices = np.arange(n_digits)[::-1]
+        for i in range(n_digits):
+            j = new_digit_indices[i]
+            try:
+                image[coords[i, 0]: coords[i, 0] + coords[i, 2], \
+                                    coords[i, 1]: coords[i, 1] + coords[i, 3]] = \
+                image[coords[j, 0]: coords[j, 0] + coords[j, 2], \
+                      coords[j, 1]: coords[j, 1] + coords[j, 3]]
+            except Exception as e:
+                print(e)
+                print('ix broke', ix)
+                print('coords', coords)
+                print('---------------------')
+                raise Exception(e)
+            labels[i] = labels[j]
+        return (image, labels)
+
+    @action
+    @inbatch_parallel(init='indices', post='_assemble', components='digit_coordinates')
+    def flatten_component(self, ix):
+        data = list(self.get(ix, 'digit_coordinates').reshape(-1))
+        # print('data shape', data.shape)
+        return (data, )
+
+    @action
+    @inbatch_parallel(init='indices', post='_assemble', components='digit_coordinates')
+    def tmp(self, ix):
+        comp_data = self.get(component='digit_coordinates')
+        print(comp_data.shape, 'comp data shape')
+        print(comp_data.ndim, 'comp data ndim')
 
     def denormalize_bboxes(self, data, height, width):
         """ Converts values of bbox to global coordinates and changes layout to 
@@ -85,7 +238,7 @@ class MeterBatch(ImagesBatch):
         # print('exit')
         return np.vstack([data[:, 1], data[:, 0], data[:, 3], data[:, 2]]).T
 
-    def normalize_bboxes(self, data, height, width):
+    def normalize_bboxes(self, data, height, width, all_corners=True):
         """ Converts values of bbox to relative coordinates and changes an order of axes.
         Parameters
         ----------
@@ -100,14 +253,15 @@ class MeterBatch(ImagesBatch):
         -------
         normalized bbox in format [left_x, left_y, height, width]
         """
-        data = copy.deepcopy(data.reshape((-1, 4)))
+        data = copy.deepcopy(data.reshape((-1, 4)).astype(np.float))
         data[:, 0] /= float(width)
         data[:, 2] /= float(width)
         data[:, 1] /= float(height)
         data[:, 3] /= float(height)
-        
-        data[:, 2] = data[:, 2] - data[:, 0]
-        data[:, 3] = data[:, 3] - data[:, 1]
+
+        if all_corners:
+            data[:, 2] = data[:, 2] - data[:, 0]
+            data[:, 3] = data[:, 3] - data[:, 1]
         return np.vstack([data[:, 1], data[:, 0], data[:, 3], data[:, 2]]).T
 
     @action
@@ -192,7 +346,10 @@ class MeterBatch(ImagesBatch):
         self
         """
         image = self.get(ix, src)
-        x, y, width, height = self.get(ix, component_coord)
+        try:
+            x, y, width, height = self.get(ix, component_coord)
+        except Exception as e:
+            print(e, self.get(ix, component_coord))
         i = self.get_pos(None, src, ix)
         dst_data = image[y:y+height, x:x+width].copy()
         getattr(self, dst)[i] = dst_data
@@ -204,6 +361,27 @@ class MeterBatch(ImagesBatch):
         self.confidence = np.zeros((batch_size, num_digits, 1))
         self.coordinates = np.zeros((batch_size, num_digits, 4))
         return self
+
+    @action
+    @inbatch_parallel(init='indices', post='_assemble')
+    def load_pil(self, ix, src=None, components="images"):
+        """ Loads image using PIL
+
+        .. note:: Please note that ``dst`` must be ``str`` only, sequence is not allowed here.
+
+        Parameters
+        ----------
+        src : str, None
+            Path to the folder with an image. If src is None then it is determined from the index.
+        dst : str
+            Component to write images to.
+
+        Returns
+        -------
+        self
+        """
+
+        return (np.array(Image.open(self._make_path(ix, src))),)
 
     @action
     @inbatch_parallel(init='_init_component', src='images', dst='background', target='threads')
@@ -596,3 +774,32 @@ class MeterBatch(ImagesBatch):
             data = np.array(data)
             setattr(self, comp, data)
         return self
+
+
+def load_func(data, fmt, components=None, *args, **kwargs):
+        """Writes the data for components to a dictionary of the form:
+        key : component's name
+        value : data for this component
+        Parameters
+        ----------
+        data : DataFrame
+            inputs data
+        fmt : strig
+            data format
+        components : list or str
+            the names of the components into which the data will be loaded.
+        Returns
+        -------
+        dict with keys - names of the compoents and values - data for these components.
+        """
+        _ = fmt, args, kwargs
+        _comp_dict = dict()
+
+        for comp in components:
+            if 'labels' not in comp:
+                _comp_dict[comp] = data[data.columns[:-1]].values.astype(int)
+            else:
+                _comp_dict[comp] = data[data.columns[-1]].apply(lambda x: list(map(int, str(x).replace(',', '') \
+                                                                                              .replace('n', '') \
+                                                                                              .replace('a', '')))).values
+        return _comp_dict
