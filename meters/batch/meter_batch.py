@@ -11,6 +11,9 @@ from PIL import Image
 # import sys
 # sys.path.append('..//..//meters/')
 from ..dataset.dataset import ImagesBatch, action, inbatch_parallel, any_action_failed, DatasetIndex, F
+from ..dataset.dataset.batch_image import transform_actions
+
+@transform_actions(prefix='_', suffix='_', wrapper='apply_transform')
 
 class MeterBatch(ImagesBatch):
     """Batch class for meters"""
@@ -19,8 +22,16 @@ class MeterBatch(ImagesBatch):
 
     @property
     def target(self):
-        result = np.concatenate((self.confidence, self.coordinates), axis=-1)
+        try:
+            result = np.concatenate((np.expand_dims(self.confidence, axis=2), self.digit_coordinates), axis=-1)
+        except ValueError as e:
+            print(self.confidence.shape, self.digit_coordinates.shape)
+            len_digits = self.digit_coordinates.shape[0]
+            enlarged_coordinates = np.zeros((8 - len_digits, 4))[:len_digits, :] = len_digits #???
+            result = np.concatenate((self.confidence, enlarged_coordinates), axis=-1) 
         return result
+
+
 
     def _init_component(self, **kwargs):
         """Create a new attribute with the name specified by ``kwargs['dst']``,
@@ -172,15 +183,16 @@ class MeterBatch(ImagesBatch):
         # i = self.get_pos(None, src, ix)
         # getattr(self, dst)[i] = norm_coords
 
-    @action
-    @inbatch_parallel(init='indices', post='_assemble', components=('images', 'labels'))
-    def shuffle_digits(self, ix):
-        image = self.get(ix, 'images')
-        coords = self.get(ix, 'digit_coordinates')
-        labels = self.get(ix, 'labels')
+    # @action
+    # @inbatch_parallel(init='indices', post='_assemble', components=('images', 'labels'))
+    def _shuffle_digits_(self, image, coords, labels):
+        # print('ix', ix)
+        # image = self.get(ix, 'images')
+        # coords = self.get(ix, 'digit_coordinates')
+        # labels = self.get(ix, 'labels')
         n_digits = len(labels)
-        # new_digit_indices = np.random.choice(n_digits, size=n_digits)
-        new_digit_indices = np.arange(n_digits)[::-1]
+        new_digit_indices = np.random.choice(n_digits, size=n_digits)
+        # new_digit_indices = np.arange(n_digits)[::-1]
         for i in range(n_digits):
             j = new_digit_indices[i]
             try:
@@ -195,7 +207,10 @@ class MeterBatch(ImagesBatch):
                 print('---------------------')
                 raise Exception(e)
             labels[i] = labels[j]
-        return (image, labels)
+        # plt.imshow(image)
+        # plt.show()
+        # print('labels', labels)
+        return (image, coords, labels)
 
     @action
     @inbatch_parallel(init='indices', post='_assemble', components='digit_coordinates')
@@ -264,13 +279,59 @@ class MeterBatch(ImagesBatch):
             data[:, 3] = data[:, 3] - data[:, 1]
         return np.vstack([data[:, 1], data[:, 0], data[:, 3], data[:, 2]]).T
 
-    @action
-    @inbatch_parallel(init='indices', post='_assemble', components=('new_images', 'coordinates'))
-    def hommography_transform(self, ix, eps=10, resize_prob=0.9):
-        image = self.get(ix, 'new_images')
-        bboxes = self.get(ix, 'coordinates')
+    def _random_crop_(self, image, bboxes):
+        denorm_boxes = self.denormalize_bboxes(bboxes, image.shape[0], image.shape[1])[:, np.argsort([1, 0, 3, 2])]
+        # result = denorm_boxes.reshape((-1, 2, 2))
+        # low_y, low_x = np.minimum(result[0, 0, :].astype(np.int16), result[-1, 0, :].astype(np.int16))  
+        # low_y, low_x = np.maximum(np.array([low_y, low_x]) - np.random.randint(0, eps, 2), np.array([0, 0]))
+        # high_y, high_x = np.maximum(result[-1, 1, :].astype(np.int16), result[0, 1, :].astype(np.int16))
+        # high_y, high_x = np.minimum(np.array([high_y, high_x]) + np.random.randint(0, eps, 2), np.asarray(im_out.shape[:2])[::-1])
+
+        low_y = (denorm_boxes[0, 1])
+        low_x = (denorm_boxes[0, 0])
+        high_y = (denorm_boxes[-1, 1])
+        high_x = (denorm_boxes[-1, 0])
+
+
+        scales = np.random.uniform(0, 0.15, size=4)
+        low_y = max(0, int(low_y - image.shape[1] * scales[0]))
+        low_x = max(0, int(low_x - image.shape[0] * scales[1]))
+        high_x = min(image.shape[0], int(high_x + image.shape[0] * scales[2]))
+        high_y = min(image.shape[1], int(high_y + image.shape[1] * scales[3]))
+
+        # try:
+        #     low_y = max(1.3 * low_y, 0)
+        #     low_x /= 1.3
+        #     high_x *= 1.3
+        #     high_y *= 1.3
+        #     new_im_out = im_out[low_x: high_x, low_y: high_y]
+        # except Exception as e:
+        #     low_y, low_x = np.minimum(result[0, 0, :].astype(np.int16), result[-1, 0, :].astype(np.int16))  
+        #     low_y, low_x = np.maximum(np.array([low_y, low_x]) - np.random.randint(0, eps, 2), np.array([0, 0]))
+        #     high_y, high_x = np.maximum(result[-1, 1, :].astype(np.int16), result[0, 1, :].astype(np.int16))
+        #     high_y, high_x = np.minimum(np.array([high_y, high_x]) + np.random.randint(0, eps, 2), np.asarray(im_out.shape[:2])[::-1])
+
+        new_im_out = image[low_x: high_x, low_y: high_y]
+
+        denorm_boxes[:, 1::2] -= low_y
+        denorm_boxes[:, ::2] -= low_x
+
+        factor = np.asarray(image.shape[:2]) / np.asarray(new_im_out.shape[:2])
+        result = (denorm_boxes * np.tile(factor[::-1], 2)).reshape((-1, 4))
+        im_out = imresize(new_im_out, image.shape) / 255.
+        normalized_result = self.normalize_bboxes(result[:, np.argsort([1, 0, 3, 2])], image.shape[0], image.shape[1])
+        return (new_im_out, normalized_result)
+
+    # @action
+    # @inbatch_parallel(init='indices', post='_assemble', components=('new_images', 'digit_coordinates'))
+    def _hommography_transform_(self, image, bboxes, labels, eps=5, resize_prob=0.9):
+        # image = self.get(ix, 'new_images')
+        # bboxes = self.get(ix, 'digit_coordinates')
+        n_digits = np.array(labels).shape[0]
+        assert n_digits > 1
+
         digit_size = (bboxes.reshape((8, 4))[0, 3] * image.shape[1], bboxes.reshape((8, 4))[0, 2] * image.shape[0])
-        denorm_boxes = self.denormalize_bboxes(bboxes, image.shape[0], image.shape[1])
+        denorm_boxes = self.denormalize_bboxes(bboxes, image.shape[0], image.shape[1])[:n_digits, :]
         pts_src = np.array([denorm_boxes[0, 0:2], [denorm_boxes[0, 0], denorm_boxes[0, 3]],
                             denorm_boxes[-1, :2], [denorm_boxes[-1, 0], denorm_boxes[-1, 3]]])
         pts_dst = copy.deepcopy(pts_src)
@@ -285,23 +346,43 @@ class MeterBatch(ImagesBatch):
 
         h, status = cv2.findHomography(pts_src, pts_dst)
         im_out = cv2.warpPerspective(image, h, (image.shape[1],image.shape[0]), borderMode=cv2.BORDER_REPLICATE)
-        new_bboxes = np.dot(h, np.concatenate((denorm_boxes.reshape((8, 2, 2)) , np.ones((8, 2, 1))), axis=2).transpose(0, 2, 1))
+        new_bboxes = np.dot(h, np.concatenate((denorm_boxes.reshape((n_digits, 2, 2)) , np.ones((n_digits, 2, 1))), axis=2).transpose(0, 2, 1))
         result = (new_bboxes / new_bboxes[2])[:2, :, :].transpose(1, 2, 0)
         
         if np.random.uniform(0, 1) < resize_prob:
-            low_y, low_x = np.minimum(result[0, 0, :].astype(np.int16), result[-1, 0, :].astype(np.int16))
+            low_y, low_x = np.minimum(result[0, 0, :].astype(np.int16), result[-1, 0, :].astype(np.int16))  
             low_y, low_x = np.maximum(np.array([low_y, low_x]) - np.random.randint(0, eps, 2), np.array([0, 0]))
             high_y, high_x = np.maximum(result[-1, 1, :].astype(np.int16), result[0, 1, :].astype(np.int16))
             high_y, high_x = np.minimum(np.array([high_y, high_x]) + np.random.randint(0, eps, 2), np.asarray(im_out.shape[:2])[::-1])
 
+            scales = np.random.uniform(0, 0.15, size=4)
+            low_y = max(0, int(low_y - image.shape[1] * scales[0]))
+            low_x = max(0, int(low_x - image.shape[0] * scales[1]))
+            high_x = min(image.shape[0], int(high_x + image.shape[0] * scales[2]))
+            high_y = min(image.shape[1], int(high_y + image.shape[1] * scales[3]))
+
+            # try:
+            #     low_y = max(1.3 * low_y, 0)
+            #     low_x /= 1.3
+            #     high_x *= 1.3
+            #     high_y *= 1.3
+            #     new_im_out = im_out[low_x: high_x, low_y: high_y]
+            # except Exception as e:
+            #     low_y, low_x = np.minimum(result[0, 0, :].astype(np.int16), result[-1, 0, :].astype(np.int16))  
+            #     low_y, low_x = np.maximum(np.array([low_y, low_x]) - np.random.randint(0, eps, 2), np.array([0, 0]))
+            #     high_y, high_x = np.maximum(result[-1, 1, :].astype(np.int16), result[0, 1, :].astype(np.int16))
+            #     high_y, high_x = np.minimum(np.array([high_y, high_x]) + np.random.randint(0, eps, 2), np.asarray(im_out.shape[:2])[::-1])
+
             new_im_out = im_out[low_x: high_x, low_y: high_y]
+
             result[:, :, 0] -= low_y
             result[:, :, 1] -= low_x
             factor = np.asarray(im_out.shape[:2]) / np.asarray(new_im_out.shape[:2])
             result = (np.reshape(result, (-1, 4)) * np.tile(factor[::-1], 2)).reshape((-1, 2, 2))
             im_out = imresize(new_im_out, image.shape) / 255.
         normalized_result = self.normalize_bboxes(result, image.shape[0], image.shape[1])
-        return im_out, normalized_result
+        normalized_result = np.vstack((normalized_result, np.zeros((8 - n_digits, 4))))
+        return (im_out, normalized_result, labels)
     
     # @action
     # @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
@@ -705,16 +786,21 @@ class MeterBatch(ImagesBatch):
         -------
             One hot labels"""
         label =  self.get(ind, 'labels')
-        if isinstance(label, (list, tuple)):
-            print('here')
-            one_hot = np.zeros((len(label), 10))
+        if isinstance(label, (np.ndarray, list, tuple)):
+            # print('here')
+            if isinstance(label, np.ndarray):
+                len_label = label.shape[0]
+            else:
+                len_label = len(label)
+            one_hot = np.zeros((len_label, 10))
             for i in range(len(label)):
                 one_hot[i, label[i]] = 1
+            return (one_hot, )
         else:
             one_hot = np.zeros(10)
             one_hot[label] = 1
         # print(one_hot.shape)
-        return (one_hot.reshape(-1),)
+            return (one_hot.reshape(-1),)
 
 
     @action
