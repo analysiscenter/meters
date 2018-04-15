@@ -23,7 +23,11 @@ class MeterBatch(ImagesBatch):
     @property
     def target(self):
         try:
-            result = np.concatenate((np.expand_dims(self.confidence, axis=2), self.digit_coordinates), axis=-1)
+            # result = np.concatenate((np.expand_dims(self.confidence, axis=2), self.digit_coordinates), axis=-1)
+            if len(self.confidence.shape) + 1 == len(self.digit_coordinates.shape):
+                result = np.concatenate((np.expand_dims(self.confidence, axis=2), self.digit_coordinates), axis=-1)
+            else:
+                result = np.concatenate((self.confidence, self.digit_coordinates), axis=-1)
         except ValueError as e:
             print(self.confidence.shape, self.digit_coordinates.shape)
             len_digits = self.digit_coordinates.shape[0]
@@ -146,15 +150,19 @@ class MeterBatch(ImagesBatch):
             digit_coordinates[i, :] = x, y_i, height, width_i
         return (digit_coordinates.astype(np.int16), )
 
-
     @action
-    @inbatch_parallel(init='indices', post='_assemble', components='coordinates')
-    def enlarge_coordinates(self, ix, src='coordinates'):
+    @inbatch_parallel(init='indices')
+    # , post='_assemble', components='coordinates')
+    def enlarge_coordinates(self, ix, src='coordinates', dst='coordinates'):
         y, x, width, height = self.get(ix, src)
         image_height, image_width = self.get(ix, 'images').shape[:2]
-        digit_height, digit_width = self.get(ix, 'digit_coordinates')[0, 2:]
         try:
-            shift_left, shift_right = np.random.randint(digit_width * 2, digit_width * 4, size=2)
+            digit_height, digit_width = self.get(ix, 'digit_coordinates')[0, 2:]
+        except TypeError as e:
+            digit_height, digit_width = height, width / 8
+        try:
+            # shift_left, shift_right = np.random.randint(digit_width * 2, digit_width * 4, size=2)
+            shift_left, shift_right = np.random.randint(digit_width, digit_width * 2, size=2)
         except Exception as e:
             print('except', e)
             print('ix=', ix)
@@ -162,7 +170,11 @@ class MeterBatch(ImagesBatch):
         shift_up, shift_down = np.random.randint(digit_height, digit_height * 1.5, size=2)
         y, x = max(y - shift_left, 0), max(x - shift_up, 0)
         width, height = min(width + shift_right + shift_left, image_width), min(height + shift_up + shift_down, image_height)
-        return ([y, x, width, height], )
+        
+        i = self.get_pos(None, src, ix)
+        getattr(self, dst)[i] = [y, x, width, height]
+
+        # return ([y, x, width, height], )
 
     @action
     @inbatch_parallel(init='indices', post='_assemble', components='digit_coordinates')
@@ -411,7 +423,8 @@ class MeterBatch(ImagesBatch):
     #     getattr(self, dst)[i] = dst_data
 
     @action
-    @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
+    # @inbatch_parallel(init='_init_component', src='images', dst='display', target='threads')
+    @inbatch_parallel(init='indices', post='_assemble', components='images')
     def crop_from_bbox(self, ix, src='images', dst='display', component_coord='coordinates'):
         """Crop area from an image using ``coordinates`` attribute
         Parameters
@@ -433,14 +446,15 @@ class MeterBatch(ImagesBatch):
             print(e, self.get(ix, component_coord))
         i = self.get_pos(None, src, ix)
         dst_data = image[y:y+height, x:x+width].copy()
-        getattr(self, dst)[i] = dst_data
-
+        # getattr(self, dst)[i] = dst_data
+        return (dst_data, )
 
     @action    
     def put_dummies(self, num_digits=8):
         batch_size = self.new_images.shape[0]
         self.confidence = np.zeros((batch_size, num_digits, 1))
         self.coordinates = np.zeros((batch_size, num_digits, 4))
+        self.digit_coordinates = np.zeros((batch_size, num_digits, 4))      
         return self
 
     @action
